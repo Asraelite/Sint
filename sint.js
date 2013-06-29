@@ -17,39 +17,35 @@ window.requestAnimFrame = (function(){
 })();
 
 // Set up variables.
-
 function reset(){
+	// Create arrays.
 	actors = [];
 	controllers = [];
 	particles =  [];
 	ais = [];
 	keys = [];
 	
+	// Create 2 actors.
 	actors[0] = new Actor(1, 200, 3, 5, 5);
 	actors[1] = new Actor(2, 200, 3, 50, 5);
 	
-	actors[2] = new Actor(2, 200, 1, 100, -100);
-	
-	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'flo', 100]]);
+	// Create player key controllers.
+	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'stream', 100]]);
 	controllers[1] = new Controller(actors[1], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
-	controllers[2] = new Controller(actors[2], [[90, 'camera']]);
 	
-	ais[0] = new Ai(actors[2], 'pace');
-	
-	particles[0] = new Particle(0, 0, 2000, 100, 200, 10, 0);
-	
-	camera = [actors[0], actors[1]];
-	canvas.style.background = '#fff';
+	camera = [actors[0], actors[1]]; // Set camera.
+	canvas.style.background = '#fff'; // Set canvas style.
 	canvas.style.display = 'block';
-	canvas.style.border = '1px solid #ddd'
-	spritesheet = new Image()
+	canvas.style.border = '1px solid #ddd';
+	spritesheet = new Image();
 	spritesheet.src = 'newsprites.png';
 	document.addEventListener('keydown', keyDown, true);
 	document.addEventListener('keyup', keyUp, true);
 	animate();
 }
 
-level = [
+// Define the level.
+levels = [
 			 ['#...................#']
 			,['#...................#']
 			,['########............#']
@@ -62,10 +58,12 @@ function animate() {
 	loopGame();
 }
 
+// Round a number.
 function r(num){
 	return Math.round(num);
 }
 
+// Add key pressed to key list.
 function keyDown(e){
 	var keyPress;
 	if (typeof event !== 'undefined') {
@@ -78,6 +76,7 @@ function keyDown(e){
 	}
 }
 
+// Remove key from key list.
 function keyUp(e){
 	var keyPress;
 	if (typeof event !== 'undefined') {
@@ -180,6 +179,9 @@ function Actor(type, health, power, xpos, ypos){
 			case 'flo':
 				particles.push(new Particle(2, 0, 100000, this.x, this.y - 16, this.xvel * 4 + ((Math.random() - 0.5) * 10), -10));
 				break;
+			case 'new':
+				particles.push(new Particle(3, 0, 10000, this.x, this.y - 1, this.xvel * 4 + ((Math.random() - 0.5) * 5), -6 + this.yvel * 2));
+				break;
 		}
 		this.actionsturn.push(type);
 	}
@@ -188,12 +190,12 @@ function Actor(type, health, power, xpos, ypos){
 		this.left = this.right = false;
 		for(j in actors){
 			if(actors[j].image != this.image){
-				if(actors[j].x + 17 > this.x && this.x > actors[j].x && this.sameY(actors[j])){
+				if(actors[j].x + 16 > this.x && this.x > actors[j].x && this.sameY(actors[j])){
 					this.left = true;
 					this.x = actors[j].x + 16;
 					this.xvel = (this.xvel < 0 ? 0 : this.xvel);
 				}
-				if(this.x + 17 > actors[j].x && this.x < actors[j].x && this.sameY(actors[j])){
+				if(this.x + 16 > actors[j].x && this.x < actors[j].x && this.sameY(actors[j])){
 					this.right = true;
 					this.x = actors[j].x - 16;
 					this.xvel = (this.xvel > 0 ? 0 : this.xvel);
@@ -204,28 +206,33 @@ function Actor(type, health, power, xpos, ypos){
 	
 	this.yCheck = function(){
 		this.up = this.down = false;
+		
 		if(this.y >= 216){
 			this.down = true;
 			this.y = 216;
-			this.yvel = 0;
 		}
+		
 		for(j in actors){
 			if(actors[j].image != this.image){
-				if(this.y + 15 > actors[j].y && this.y < actors[j].y + 15 && this.sameX(actors[j])){
-					this.down = true;
-					this.y = actors[j].y - 18;
-					this.yvel = 0;
+				if(this.y + 16 > actors[j].y && this.y < actors[j].y + 16 && this.sameX(actors[j])){
+					if(this.y < actors[j].y){
+						this.down = true;
+						this.y = actors[j].y - 16;
+					}else{
+						this.up = true;
+						this.y = actors[j].y + 16;
+					}
 				}
 			}
 		}
 	}
 	
 	this.sameY = function(obj){
-		return (this.y < obj.y + 15 && this.y + 15 > obj.y);
+		return (this.y < obj.y + 15 && this.y + 16 > obj.y);
 	}
 	
 	this.sameX = function(obj){
-		return (this.x + 16 > obj.x && this.x < obj.x + 16);
+		return (this.x + 15 > obj.x && this.x < obj.x + 15);
 	}
 	
 	this.simulate = function(){
@@ -272,7 +279,7 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 	this.yvel = yvel;
 	this.type = type;
 	this.life = lifespan;
-	this.size = [3, 5, 7][type];
+	this.size = [3, 5, 7, 32][type];
 	this.created = this.timeup = new Date();
 	this.timeup = new Date(this.timeup.getTime() + lifespan);
 	this.deleteme = false;
@@ -309,6 +316,14 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 				context.strokeRect(r(this.x - lookx) + 0.5, r(213 - (this.y - 216) - looky) + 0.5, 5, 5);
 				context.globalAlpha = 1;
 				break;
+			case 3:
+				context.globalAlpha = 0.5;
+				context.lineWidth = 2;
+				context.strokeStyle = '#000';
+				context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 32, 32);
+				context.strokeStyle = '#777';
+				context.strokeRect(r(this.x - lookx) + 0.5, r(213 - (this.y - 216) - looky) + 0.5, 32, 32);
+				context.globalAlpha = 1;
 		}
 	}
 	
@@ -358,10 +373,40 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 					}
 				}
 				break;
+			case 3:
+				//this.yvel += (this.onGround() ? 0 : 0.007 * speed);
+				//if(this.onGround()){
+				//	this.y = 216 - this.size;
+				//	this.yvel = (this.yvel > 2 ? this.yvel * -0.7 : 0);
+				break;
 		}
 		if(thisLoop > this.timeup){
 			this.deleteme = true;
 		}
+	}
+}
+
+// Collision detection class
+function Box(x, y, w, h, xvel, yvel, colgroup){
+	this.x = x;
+	this.y = y;
+	this.width = w;
+	this.height = h;
+	this.col = colgroup;
+	
+	this.reset = function(){
+		this.down = this.up = this.left = this.right = false;
+	}
+	
+	this.collide = function(){
+	
+	}
+	
+	this.move = function(xmov, ymov){
+		this.x += xmov;
+		this.y += ymov;
+		this.reset();
+		
 	}
 }
 
