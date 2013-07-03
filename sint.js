@@ -16,31 +16,59 @@ window.requestAnimFrame = (function(){
 		};
 })();
 
-// Set up variables.
+// Get mouse position
+function getMouse(evt) {
+        var rect = canvas.getBoundingClientRect();
+        return {
+          x: evt.clientX - rect.left,
+          y: evt.clientY - rect.top,
+		  click: false
+        };
+      }
+
+// Set up variables
 function reset(){
-	// Create arrays.
+	// Create arrays
 	actors = [];
+	controllers = [];
 	controllers = [];
 	particles =  [];
 	ais = [];
 	keys = [];
+	mouse = {
+		x: 0,
+		y: 0,
+		down: false
+	};
+	sound = {
+		shoot1: new Audio('sfx.wav')
+	}
+	game = 'menu';
 	
-	// Create 2 actors.
-	actors[0] = new Actor(1, 200, 3, 5, 5);
-	actors[1] = new Actor(2, 200, 3, 50, 5);
+	// Create 2 actors
+	actors[0] = new Actor(0, 'player', 200, 3, 5, 5);
+	//actors[1] = new Actor(1, 'player', 200, 3, 50, 5);
+	
+	actors[2] = new Actor(6, 'all', 50, 3, 100, 150);
 	
 	// Create player key controllers.
-	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'stream', 100]]);
-	controllers[1] = new Controller(actors[1], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
+	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'dark', 100], [83, 'shoot']]);
+	//controllers[1] = new Controller(actors[1], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
 	
-	camera = [actors[0], actors[1]]; // Set camera.
+	ais[0] = new Ai(actors[2], 'alphabot');
+	// type, affiliation, lifespan, xpos, ypos, xvel, yvel
+	particles[0] = new Particle('mouse', 0, 10000000000, 0, 0, 0, 0);
+	
+	camera = [actors[0]]; // Set camera.
 	canvas.style.background = '#fff'; // Set canvas style.
-	canvas.style.display = 'block';
+	level = 0 // Set level
+	canvas.style.display = 'block'; // Set up canvas
 	canvas.style.border = '1px solid #ddd';
-	spritesheet = new Image();
-	spritesheet.src = 'newsprites.png';
-	document.addEventListener('keydown', keyDown, true);
+	spritesheet = new Image(); // Define spritesheet
+	spritesheet.src = 'actors.png';
+	document.addEventListener('keydown', keyDown, true); // Add key events
 	document.addEventListener('keyup', keyUp, true);
+	canvas.addEventListener('mousemove', function(evt){mouse = getMouse(evt)}, false);
 	animate();
 }
 
@@ -106,7 +134,7 @@ function Ai(object, ai){
 	this.aivars = [0, 0, 0];
 	this.run = function(){
 		switch(ai){
-			case 'alphaBot':
+			case 'alphaBot': // Work in progress following melee AI
 				var playerIndex = -1;
 				var topDistance = 400;
 				for(i in actors){
@@ -119,7 +147,7 @@ function Ai(object, ai){
 					
 				}
 				break;
-			case 'pace':
+			case 'pace': // Test AI
 				if(this.aivars[0] == 0 || this.actor.x < -300 || this.actor.x > 300){
 					this.aivars[0] = (this.actor.x > 0 ? -1 : 1);
 				}
@@ -127,24 +155,33 @@ function Ai(object, ai){
 					this.action('jump');
 				}
 				this.actor.xvel += ((0.02 * this.aivars[0]) * speed);
+				break;
+			case 'still':
+				this.actor.x = mouse.x + lookx;
+				this.actor.y = mouse.y + looky;
+				this.actor.xvel = 0;
+				this.actor.yvel = 0;
+				break;
 		}
 	}
 }
 
-function Actor(type, health, power, xpos, ypos){
-	this.image = type;
+// Actor class for all solid cubes
+function Actor(image, type, health, power, xpos, ypos){
+	this.image = image;
+	this.group = type;
 	this.health = health;
 	this.power = power;
 	this.xvel = this.yvel = this.jump = 0;
 	this.imageLoad = 2;
-	this.right = false;
-	this.left = false;
-	this.down = false;
-	this.up = false;
+	this.right = this.left = this.up = this.down = false;
+	this.box = new Box(this.x, this.y, 16, 16, this.xvel, this.yvel, ['player', 'pacer']); // Set physics class for this actor
 	this.x = xpos;
 	this.y = ypos;
 	this.oneactions = [];
 	this.actionsturn = [];
+	this.index = actors.length;
+	this.vars = [false, false, false]; // for use by AIs to control particles
 	
 	this.refreshActions = function(){
 		this.oneactions = [];
@@ -153,25 +190,27 @@ function Actor(type, health, power, xpos, ypos){
 		}
 	}
 	
+	// Actions to call from controllers
 	this.action = function(type){
 		switch(type){
 			case 'moveLeft':
-				this.xvel -= (0.05 * speed);
+				this.xvel -= (0.08 * speed);
 				break;
 			case 'moveRight':
-				this.xvel += (0.05 * speed);
+				this.xvel += (0.08 * speed);
 				break;
 			case 'jump':
 				this.yvel = (this.down ? -4 - this.power : this.yvel);
 				break;
 			case 'melee':
-				this.yvel = -6;
+				this.yvel = 10;
 				break;
 			case 'camera':
 				camera = [this];
 				break;
 			case 'stream':
-				particles.push(new Particle(0, 0, 60000, this.x, this.y - 1, this.xvel * 3 + ((Math.random() - 0.5) * 10), -3 + this.yvel * 3));
+				particles.push(new Particle(0, 0, 60000, this.x, this.y - 1, this.xvel + ((this.x - (lookx + 250)) + (mouse.x - 250)) / 30, -3 + this.yvel * 3));
+				sound.shoot1.play();
 				break;
 			case 'bounce':
 				particles.push(new Particle(1, 0, 5000, this.x, this.y - 1, this.xvel * 2 + ((Math.random() - 0.5) * 5), -5 + this.yvel * 3));
@@ -179,8 +218,12 @@ function Actor(type, health, power, xpos, ypos){
 			case 'flo':
 				particles.push(new Particle(2, 0, 100000, this.x, this.y - 16, this.xvel * 4 + ((Math.random() - 0.5) * 10), -10));
 				break;
-			case 'new':
-				particles.push(new Particle(3, 0, 10000, this.x, this.y - 1, this.xvel * 4 + ((Math.random() - 0.5) * 5), -6 + this.yvel * 2));
+			case 'dark':
+				particles.push(new Particle(3, this.index, 3000, this.x, this.y, this.xvel, this.yvel));
+				this.vars = [false, false, false]
+				break;
+			case 'shoot':
+				this.vars = [true, this.xvel + (mouse.x + 250 - (this.x - lookx + 250)) / 30, this.yvel + (mouse.y - this.y) / 30];
 				break;
 		}
 		this.actionsturn.push(type);
@@ -238,10 +281,10 @@ function Actor(type, health, power, xpos, ypos){
 	this.simulate = function(){
 		this.y += this.yvel;
 		this.yCheck();
-		if(this.down){
-			if(this.yvel > 10){
+		if(this.down || this.up){
+			if(Math.abs(this.yvel) > 8){
 				this.yvel *= -0.2;
-				this.y -= 1;
+				this.y -= 0;
 			}else{
 				this.yvel = 0;
 			}
@@ -250,24 +293,31 @@ function Actor(type, health, power, xpos, ypos){
 		}
 		this.x += this.xvel;
 		this.xCheck();
-		this.xvel /= 1 + (0.005 * speed);
+		this.xvel *= Math.pow(0.992, speed);
 	}
 	
 	this.draw = function(){
-		context.drawImage(spritesheet, this.image * 17, 0, 16, 16, r(this.x - lookx), r(this.y - 16 - looky), 16, 16);
+		var reflect = 100; // Depth reflection goes before fading completely
+		var drawx = r(this.x - lookx);
+		var drawy = 
+		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r(this.y - 16 - looky), 16, 16);
 		context.globalAlpha = 1;
-		context.drawImage(spritesheet, this.image * 17, 17, 16, 16, r(this.x - lookx), r((216 - (this.y - 216)) - looky), 16, 16);
+		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r((216 - (this.y - 216)) - looky), 16, 16);
 		// StartX, StartY, EndX, EndY
-		var gradient = context.createLinearGradient(r(this.x - lookx), r((214 - (this.y - 216)) - looky - 5), r(this.x - lookx), r((214 - (this.y - 216)) - looky) + 16);
-		gradient.addColorStop(0.1, 'rgba(255, 255, 255, 0)');
+		var gradient = context.createLinearGradient(drawx, r((216 - this.y + 216) - looky - 5), drawx, r((214 - (this.y - 216)) - looky) + 16);
+		gradient.addColorStop(0.1, 'rgba(255, 255, 255, ' + (this.y < 120 ? 1 : ((200 - this.y) / 35) + 0.2) +')');
 		gradient.addColorStop(0.9, 'rgba(255, 255, 255, 1)');
 		context.fillStyle = gradient;
-		context.fillRect(r(this.x - lookx), r((216 - (this.y - 216)) - looky), 16, 16);
+		context.fillRect(drawx, r((216 - (this.y - 216)) - looky), 16, 16);
 		context.globalAlpha = 1;
 		context.fillStyle = "#444";
 		context.font = "10pt Arial";
-		context.fillText(actors[0].sameY(actors[1]), 10, 100);
-		//context.fillText(particles[0].deleteme, 10, 120);
+		context.textAlign = 'left';
+		context.fillText('Health: ' + actors[0].health, 10, 290);
+		context.fillText('X: ' + r(actors[0].x), 10, 310);
+		context.fillText('Y: ' + r(actors[0].y), 70, 310);
+		context.textAlign = 'right';
+		context.fillText('Sint version 0.2.1', 490, 310);
 	}
 	//this.xvel += (canMove(xpos, ypos, '-1', this.xvel));
 }
@@ -279,11 +329,13 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 	this.yvel = yvel;
 	this.type = type;
 	this.life = lifespan;
-	this.size = [3, 5, 7, 32][type];
+	this.size = [3, 5, 7, 5][type];
 	this.created = this.timeup = new Date();
 	this.timeup = new Date(this.timeup.getTime() + lifespan);
 	this.deleteme = false;
-	var angle = Math.random() * 360
+	this.aff = affiliation;
+	this.vars = [false, false];
+	var angle = Math.random() * 360;
 	this.addx = Math.sin(angle) * ((particles.length + 200) / 5);
 	this.addy = Math.cos(angle) * ((particles.length + 200) / 10);
 	
@@ -291,6 +343,13 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 		//context.beginPath();
 		//context.rect(this.x, this.y, 3, 3);
 		switch(this.type){
+			case 'mouse':
+				context.globalAlpha = 0.7;
+				context.lineWidth = 2;
+				context.strokeStyle = '#33d';
+				context.strokeRect(mouse.x - this.vars[0] / 2, mouse.y - this.vars[0] / 2, this.vars[0], this.vars[0]);
+				context.globalAlpha = 1;
+				break;
 			case 0:
 				context.globalAlpha = 1;
 				context.lineWidth = 1;
@@ -304,7 +363,7 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 				context.lineWidth = 2;
 				context.strokeStyle = '#b79';
 				context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 4, 4);
-				context.strokeStyle = '#fac';
+				context.strokeStyle = '#fbd';
 				context.strokeRect(r(this.x - lookx) + 0.5, r(213 - (this.y - 216) - looky) + 0.5, 4, 4);
 				break;
 			case 2:
@@ -312,30 +371,46 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 				context.lineWidth = 1;
 				context.strokeStyle = '#363';
 				context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 5, 5);
-				context.strokeStyle = '#7b7';
+				context.strokeStyle = '#9c9';
 				context.strokeRect(r(this.x - lookx) + 0.5, r(213 - (this.y - 216) - looky) + 0.5, 5, 5);
 				context.globalAlpha = 1;
 				break;
 			case 3:
 				context.globalAlpha = 0.5;
-				context.lineWidth = 2;
+				context.lineWidth = 1;
 				context.strokeStyle = '#000';
-				context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 32, 32);
-				context.strokeStyle = '#777';
-				context.strokeRect(r(this.x - lookx) + 0.5, r(213 - (this.y - 216) - looky) + 0.5, 32, 32);
+				context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 4, 4);
+				context.strokeStyle = '#aaa';
+				context.strokeRect(r(this.x - lookx) + 0.5, r(213 - (this.y - 216) - looky) + 0.5, 4, 4);
 				context.globalAlpha = 1;
 		}
 	}
 	
 	this.onGround = function(){
-		return (this.y + this.size >= 216);
+		return (this.y > 216 - this.size);
 	}
 	
 	this.simulate = function(){
 		switch(this.type){
+			case 'mouse':
+				if(this.vars[0] == false){
+					this.vars[0] = 8;
+				}
+				if(this.vars[1] == true){
+					this.vars[0] += 0.4;
+					if(this.vars[0] >= 10){
+						this.vars[1] = false;
+					}
+				}else{
+					this.vars[0] -= 0.4;
+					if(this.vars[0] <= 7){
+						this.vars[1] = true;
+					}
+				}
+				break;
 			case 0:
 				this.yvel += (this.onGround() ? 0 : 0.01 * speed);
-				this.xvel /= 1 + (0.005 * speed);
+				this.xvel *= Math.pow(0.998, speed);;
 				this.x += this.xvel;
 				this.y += this.yvel;
 				if(this.onGround()){
@@ -345,7 +420,7 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 				break;
 			case 1:
 				this.yvel += (this.onGround() ? 0 : 0.007 * speed);
-				this.xvel /= 1 + (0.001 * speed);
+				this.xvel *= Math.pow(0.999, speed);
 				this.x += this.xvel;
 				this.y += this.yvel;
 				if(this.onGround()){
@@ -354,8 +429,8 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 				}
 				break;
 			case 2:
-				this.yvel /= 1 + (0.005 * speed);
-				this.xvel /= 1 + (0.005 * speed);
+				this.yvel *= Math.pow(0.996, speed);
+				this.xvel *= Math.pow(0.996, speed);
 				this.x += this.xvel;
 				this.y += this.yvel;
 				if(this.onGround()){
@@ -374,10 +449,34 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 				}
 				break;
 			case 3:
-				//this.yvel += (this.onGround() ? 0 : 0.007 * speed);
-				//if(this.onGround()){
-				//	this.y = 216 - this.size;
-				//	this.yvel = (this.yvel > 2 ? this.yvel * -0.7 : 0);
+				this.yvel *= Math.pow(0.996, speed);
+				this.xvel *= Math.pow(0.996, speed);
+				this.x += this.xvel;
+				this.y += this.yvel;
+				var parent = actors[this.aff];
+				if(typeof this.orbit === 'undefined'){
+					var angle = Math.random() * 360;
+					this.orbit = {
+						cube: this.affiliation,
+						x: 9 * Math.cos(angle * Math.PI / 180),
+						y: 9 * Math.sin(angle * Math.PI / 180)
+					}
+				}
+				if(parent.vars[0] == false && this.vars[0] == false){
+					this.xvel += (this.orbit.x + parent.x + 6 - this.x) / 10;
+					this.yvel += (this.orbit.y +  parent.y - 20 - this.y) / 10;
+				}else{
+					if(this.vars[1] == false){
+						this.xvel = parent.vars[1] + (Math.random() - 0.5) * 3;
+						this.yvel = parent.vars[2] + (Math.random() - 0.5) * 3;
+						this.vars[1] = true;
+					}
+					this.vars[0] = true;
+				}
+				if(this.onGround()){
+					this.y = 216 - this.size;
+					this.yvel = 0;
+				}
 				break;
 		}
 		if(thisLoop > this.timeup){
@@ -393,18 +492,31 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 	this.width = w;
 	this.height = h;
 	this.col = colgroup;
+	this.left = this.right = this.up = this.down = false;
 	
 	this.reset = function(){
 		this.down = this.up = this.left = this.right = false;
 	}
 	
 	this.collide = function(){
-	
+		// Check for collision with level
+		var lv = levels[level];
+		var colareax = ((this.width - 2) >> 4) + 2;
+		var colareay = ((this.height - 2) >> 4) + 2;
+		var any = false;
+		for(var hr = 0; hr < colareax; hr++){
+			for(var vr = 0; vr < colareay; ve++){
+				if(lv[(this.x + (16 * hr))][(this.y + (16 * vr))] == '#'){
+					any = true;
+				}
+			}
+		}
+		// Check for collision with other boxes in same collision group
 	}
 	
-	this.move = function(xmov, ymov){
-		this.x += xmov;
-		this.y += ymov;
+	this.move = function(){
+		this.x += xvel;
+		this.y += yvel;
 		this.reset();
 		
 	}
@@ -457,4 +569,10 @@ function loopGame(){
 			i--;
 		}
 	}
+	// Slow down game to test low framerates
+	/*
+	for(var j=1; j < 10000000; j++){
+		j = j;
+	}
+	*/
 }
