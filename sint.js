@@ -46,16 +46,16 @@ function reset(){
 	game = 'menu';
 	
 	// Create 2 actors
-	actors[0] = new Actor(0, 'player', 200, 3, 5, 5);
+	actors[0] = new Actor(0, 'player', 200, 3, 48, 16);
 	//actors[1] = new Actor(1, 'player', 200, 3, 50, 5);
 	
-	actors[2] = new Actor(6, 'all', 50, 3, 100, 150);
+	actors[1] = new Actor(6, 'all', 50, 3, 70, 16);
 	
 	// Create player key controllers.
 	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'dark', 100], [83, 'shoot']]);
 	//controllers[1] = new Controller(actors[1], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
 	
-	ais[0] = new Ai(actors[2], 'alphabot');
+	ais[0] = new Ai(1, 'still');
 	// type, affiliation, lifespan, xpos, ypos, xvel, yvel
 	particles[0] = new Particle('mouse', 0, 10000000000, 0, 0, 0, 0);
 	
@@ -68,17 +68,34 @@ function reset(){
 	spritesheet.src = 'actors.png';
 	document.addEventListener('keydown', keyDown, true); // Add key events
 	document.addEventListener('keyup', keyUp, true);
-	canvas.addEventListener('mousemove', function(evt){mouse = getMouse(evt)}, false);
+	document.addEventListener('mousemove', function(evt){mouse = getMouse(evt)}, false);
 	animate();
 }
 
 // Define the level.
 levels = [
-			 ['#...................#']
-			,['#...................#']
-			,['########............#']
-			,['################...##']
-			,['#####################']
+			[
+			 '.....................'
+			,'.....................'
+			,'.....................'
+			,'.....................'
+			,'#...................#'
+			,'#...................#'
+			,'#...................#'
+			,'#...................#'
+			,'#...................#'
+			,'#...................#'
+			,'#...................#'
+			,'#...................#'
+			,'#...................#'
+			,'##############.....##'
+			,'##############.....##'
+			,'#####################'
+			,'#####################'
+			,'#####################'
+			,'#####################'
+			,'#####################'
+			]
 		]
 
 function animate() {
@@ -129,22 +146,49 @@ function Controller(object, actions){
 	}
 }
 
-function Ai(object, ai){
-	this.actor = object;
+function Ai(index, ai){
+	this.actor = actors[index];
 	this.aivars = [0, 0, 0];
+	this.action = function(act){
+		this.actor.action(act);
+	}
 	this.run = function(){
+		this.actor = actors[index];
 		switch(ai){
 			case 'alphaBot': // Work in progress following melee AI
 				var playerIndex = -1;
 				var topDistance = 400;
-				for(i in actors){
-					if(actors[i].image == 0 && Math.abs(actors[i].x - this.actor) < topDistance){
-						playerIndex = i;
-						topDistance = Math.abs(actors[i].x - this.actor) - 50;
+				var distanceAway = Math.abs(actors[0].x - this.actor.x);
+				if((this.aivars[0] == 0 ? distanceAway > 150 : distanceAway < 200)){
+					if(actors[0].x > this.actor.x){
+						this.action((this.aivars[0] == 0 ? 'moveRight' : 'moveLeft'));
+					}else{
+						this.action((this.aivars[0] == 0 ? 'moveLeft' : 'moveRight'));
+					}
+					actors[index].xvel *= Math.pow(0.995, speed);
+				}else{
+				
+				}
+				if(Math.random() < 0.03 || this.aivars[2] > 0){
+					if(this.aivars[0] == 0){
+						this.aivars[2] += 1;
+						this.action('dark');
+					}else{
+						this.aivars[0] -= 1;
 					}
 				}
-				if(playerIndex >= 0){
-					
+				if(this.aivars[2] == 75){
+					this.action('jump');
+				}
+				if(this.aivars[2] > 75 && actors[index].yvel >= 0){
+					actors[index].vars = [false, (actors[0].x - this.actor.x) / 15, (actors[0].y - this.actor.y) / 10];
+					this.action('shoot');
+				}
+				if(this.aivars[2] >= 95){
+					this.aivars[0] = 10;
+					this.aivars[1] = 0;
+					this.aivars[2] = 0;
+					actors[index].vars = [false, false, false];
 				}
 				break;
 			case 'pace': // Test AI
@@ -154,13 +198,9 @@ function Ai(object, ai){
 				if(this.xvel == 0){
 					this.action('jump');
 				}
-				this.actor.xvel += ((0.02 * this.aivars[0]) * speed);
+				this.action(this.aivars[0] == 1 ? 'moveRight' : 'moveLeft');
 				break;
 			case 'still':
-				this.actor.x = mouse.x + lookx;
-				this.actor.y = mouse.y + looky;
-				this.actor.xvel = 0;
-				this.actor.yvel = 0;
 				break;
 		}
 	}
@@ -172,12 +212,13 @@ function Actor(image, type, health, power, xpos, ypos){
 	this.group = type;
 	this.health = health;
 	this.power = power;
-	this.xvel = this.yvel = this.jump = 0;
+	this.yvel = 0;
+	this.xvel = 0;
 	this.imageLoad = 2;
 	this.right = this.left = this.up = this.down = false;
-	this.box = new Box(this.x, this.y, 16, 16, this.xvel, this.yvel, ['player', 'pacer']); // Set physics class for this actor
 	this.x = xpos;
 	this.y = ypos;
+	this.box = new Box(this.x, this.y, 16, 16, this.xvel, this.yvel, ['player', 'pacer']); // Set physics class for this actor
 	this.oneactions = [];
 	this.actionsturn = [];
 	this.index = actors.length;
@@ -200,7 +241,10 @@ function Actor(image, type, health, power, xpos, ypos){
 				this.xvel += (0.08 * speed);
 				break;
 			case 'jump':
-				this.yvel = (this.down ? -4 - this.power : this.yvel);
+				if(this.box.down){
+					this.yvel = -4 - this.power;
+					this.y -= 3;
+				}
 				break;
 			case 'melee':
 				this.yvel = 10;
@@ -223,83 +267,30 @@ function Actor(image, type, health, power, xpos, ypos){
 				this.vars = [false, false, false]
 				break;
 			case 'shoot':
-				this.vars = [true, this.xvel + (mouse.x + 250 - (this.x - lookx + 250)) / 30, this.yvel + (mouse.y - this.y) / 30];
+				this.vars = [true, this.vars[1], this.vars[2]];
 				break;
 		}
 		this.actionsturn.push(type);
 	}
 	
-	this.xCheck = function(){
-		this.left = this.right = false;
-		for(j in actors){
-			if(actors[j].image != this.image){
-				if(actors[j].x + 16 > this.x && this.x > actors[j].x && this.sameY(actors[j])){
-					this.left = true;
-					this.x = actors[j].x + 16;
-					this.xvel = (this.xvel < 0 ? 0 : this.xvel);
-				}
-				if(this.x + 16 > actors[j].x && this.x < actors[j].x && this.sameY(actors[j])){
-					this.right = true;
-					this.x = actors[j].x - 16;
-					this.xvel = (this.xvel > 0 ? 0 : this.xvel);
-				}
-			}
-		}
-	}
-	
-	this.yCheck = function(){
-		this.up = this.down = false;
-		
-		if(this.y >= 216){
-			this.down = true;
-			this.y = 216;
-		}
-		
-		for(j in actors){
-			if(actors[j].image != this.image){
-				if(this.y + 16 > actors[j].y && this.y < actors[j].y + 16 && this.sameX(actors[j])){
-					if(this.y < actors[j].y){
-						this.down = true;
-						this.y = actors[j].y - 16;
-					}else{
-						this.up = true;
-						this.y = actors[j].y + 16;
-					}
-				}
-			}
-		}
-	}
-	
-	this.sameY = function(obj){
-		return (this.y < obj.y + 15 && this.y + 16 > obj.y);
-	}
-	
-	this.sameX = function(obj){
-		return (this.x + 15 > obj.x && this.x < obj.x + 15);
-	}
-	
 	this.simulate = function(){
-		this.y += this.yvel;
-		this.yCheck();
-		if(this.down || this.up){
-			if(Math.abs(this.yvel) > 8){
-				this.yvel *= -0.2;
-				this.y -= 0;
-			}else{
-				this.yvel = 0;
-			}
-		}else{
-			this.yvel += 0.03 * speed;
-		}
-		this.x += this.xvel;
-		this.xCheck();
-		this.xvel *= Math.pow(0.992, speed);
+		this.box.xvel = this.xvel;
+		this.box.yvel = this.yvel;
+		this.box.x = this.x;
+		this.box.y = this.y;
+		this.box.run();
+		this.x = this.box.x;
+		this.y = this.box.y;
+		this.xvel = this.box.xvel;
+		this.yvel = this.box.yvel;
+		
+		//this.xvel *= Math.pow(0.992, speed);
 	}
 	
 	this.draw = function(){
 		var reflect = 100; // Depth reflection goes before fading completely
 		var drawx = r(this.x - lookx);
-		var drawy = 
+		var drawy = 200;
 		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r(this.y - 16 - looky), 16, 16);
 		context.globalAlpha = 1;
 		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r((216 - (this.y - 216)) - looky), 16, 16);
@@ -309,17 +300,7 @@ function Actor(image, type, health, power, xpos, ypos){
 		gradient.addColorStop(0.9, 'rgba(255, 255, 255, 1)');
 		context.fillStyle = gradient;
 		context.fillRect(drawx, r((216 - (this.y - 216)) - looky), 16, 16);
-		context.globalAlpha = 1;
-		context.fillStyle = "#444";
-		context.font = "10pt Arial";
-		context.textAlign = 'left';
-		context.fillText('Health: ' + actors[0].health, 10, 290);
-		context.fillText('X: ' + r(actors[0].x), 10, 310);
-		context.fillText('Y: ' + r(actors[0].y), 70, 310);
-		context.textAlign = 'right';
-		context.fillText('Sint version 0.2.1', 490, 310);
 	}
-	//this.xvel += (canMove(xpos, ypos, '-1', this.xvel));
 }
 
 function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
@@ -466,12 +447,17 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 					this.xvel += (this.orbit.x + parent.x + 6 - this.x) / 10;
 					this.yvel += (this.orbit.y +  parent.y - 20 - this.y) / 10;
 				}else{
-					if(this.vars[1] == false){
-						this.xvel = parent.vars[1] + (Math.random() - 0.5) * 3;
-						this.yvel = parent.vars[2] + (Math.random() - 0.5) * 3;
-						this.vars[1] = true;
+					if(this.vars[0] == false){
+						this.xvel = parent.vars[1] + (Math.random() - 0.5) * 1.5;
+						this.yvel = parent.vars[2] + (Math.random() - 0.5) * 1.5;
+						this.vars[0] = true;
 					}
-					this.vars[0] = true;
+					for(j in actors){
+						if(this.x > actors[j].x && this.x < actors[j].x + 16 && this.y > actors[j].y - 16 && this.y < actors[j].y + 16 && true && actors[j] != parent){
+							actors[j].health -= 1;
+							this.deleteme = true;
+						}
+					}
 				}
 				if(this.onGround()){
 					this.y = 216 - this.size;
@@ -503,22 +489,56 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 		var lv = levels[level];
 		var colareax = ((this.width - 2) >> 4) + 2;
 		var colareay = ((this.height - 2) >> 4) + 2;
-		var any = false;
+		var collision = false;
+		var type = 'level';
 		for(var hr = 0; hr < colareax; hr++){
-			for(var vr = 0; vr < colareay; ve++){
-				if(lv[(this.x + (16 * hr))][(this.y + (16 * vr))] == '#'){
-					any = true;
+			for(var vr = 0; vr < colareay; vr++){
+				var xcol = ((this.x - (hr == colareax - 1 ? 1 : 0)) >> 4 + hr);
+				var ycol = ((this.y - (vr == colareay - 1 ? 1 : 0)) >> 4 + vr);
+				this.left
+				if(lv[ycol][xcol] == '#'){
+					collision = true;
 				}
 			}
 		}
+		
 		// Check for collision with other boxes in same collision group
+		/*
+		for(j in actors){
+			var obj = actors[j].box;
+			if(this.y < obj.y + 16 && this.y + 16 > obj.y && this.x + 16 > obj.x && this.x < obj.x + 16){
+				collision = true;
+				type = 'cube';
+			}
+		}
+		*/
+		return collision;
 	}
 	
 	this.move = function(){
-		this.x += xvel;
-		this.y += yvel;
+		this.down = false;
+		this.x += this.xvel;
+		if(this.collide() && Math.abs(this.xvel) > 0){
+			this.x = ((this.x >> 4) << 4) + (this.xvel > 0 ? 0 : 16);
+			//this.x = 32;
+			this.xvel = 0;
+		}
+		this.y += this.yvel;
+		if(this.collide()){
+			this.y -= this.yvel;
+			if(this.yvel < 0){
+				this.down = true;
+			}
+			this.yvel = 0;
+		}
 		this.reset();
 		
+	}
+	
+	this.run = function(){
+		this.move();
+		this.yvel += 0.5;
+		this.xvel *= Math.pow(0.99, speed);
 	}
 }
 
@@ -537,7 +557,7 @@ function loopGame(){
 	lookx = looky = 0;
 	looky = -0;
 	for(i in camera){
-		lookx += (camera[i] instanceof Array ? camera[i][0] : camera[i].x) - 250;
+		lookx += (camera[i] instanceof Array ? camera[i][0] : camera[i].x + camera[i].xvel) - 250;
 		// looky += (camera[i] == instanceof Array ? camera[i][1] : camera[i].y) - 175;
 	}
 	lookx /= camera.length;
@@ -558,6 +578,25 @@ function loopGame(){
 		actors[i].simulate();
 		actors[i].draw();
 	}
+	for(i in levels[level]){
+		for(j in levels[level][i]){
+			context.globalAlpha = 1;
+			context.lineWidth = 1;
+			context.fillStyle = '#eee';
+			if(levels[level][i][j] == '#'){
+				context.fillRect((j << 4) - lookx, i << 4, 16, 16);
+			}
+		}
+	}
+	context.globalAlpha = 1;
+	context.fillStyle = "#444";
+	context.font = "10pt Arial";
+	context.textAlign = 'left';
+	context.fillText('Health: ' + actors[0].health, 10, 290);
+	context.fillText('X: ' + r(actors[0].x), 10, 310);
+	context.fillText('Y: ' + r(actors[0].y), 70, 310);
+	context.textAlign = 'right';
+	context.fillText('Sint version 0.3 Alpha', 490, 310);
 	for(i in ais){
 		ais[i].run();
 	}
