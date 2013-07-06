@@ -249,11 +249,11 @@ function Actor(image, type, health, power, xpos, ypos){
 				this.xvel += (0.08 * speed);
 				break;
 			case 'jump':
-				this.yvel = -10;
-				if(this.box.down){
+				this.box.y += 1;
+				if(this.box.collide()){
 					this.yvel = -4 - this.power;
-					this.y -= 3;
 				}
+				this.box.y -= 1;
 				break;
 			case 'melee':
 				this.yvel = 10;
@@ -487,11 +487,16 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 	this.width = w;
 	this.height = h;
 	this.col = colgroup;
-	this.right = this.up = this.down = false;
+	this.right = false;
 	this.left = false;
+	this.up = false;
+	this.down = false;
 	
 	this.reset = function(){
-		this.down = this.up = this.left = this.right = false;
+		this.right = false;
+		this.left = false;
+		this.up = false;
+		this.down = false;
 	}
 	
 	this.collide = function(){
@@ -501,16 +506,15 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 		var colareay = ((this.height - 2) >> 4) + 2;
 		var collision = false;
 		var type = 'level';
-		this.left = 'lo';
-		test = [r(this.x)];
+		test = [];
 		for(var hr = 0; hr < colareax; hr++){
 			for(var vr = 0; vr < colareay; vr++){
-				test.push([vr, hr]);
-				var xcol = ((this.x - (hr == colareax - 1 ? 1 : 0)) >> 4 + hr);
-				var ycol = ((this.y - (vr == colareay - 1 ? 1 : 0)) >> 4 + vr);
+				var xcol = (((this.x - (hr == colareax - 1 ? 1 : 0)) >> 4) + hr);
+				var ycol = (((this.y - (vr == colareay - 1 ? 1 : 0)) >> 4) + vr); 
 				if(lv[ycol][xcol] == '#'){
 					collision = true;
 				}
+				test.push([xcol, ycol - 1]);
 			}
 		}
 		
@@ -537,7 +541,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 		}
 		this.y += this.yvel;
 		if(this.collide()){
-			this.y -= this.yvel;
+			this.y = ((this.y >> 4) << 4) + (this.yvel > 0 ? 1 : 16);
 			if(this.yvel < 0){
 				this.down = true;
 			}
@@ -548,7 +552,9 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 	}
 	
 	this.run = function(){
+		this.y += 1;
 		this.yvel += 0.5;
+		this.y -= 1;
 		this.xvel *= Math.pow(0.99, speed);
 		this.move();
 	}
@@ -602,17 +608,17 @@ function loopGame(){
 						context.fillStyle = '#ca4';
 					}
 				}
-				context.fillRect((j << 4) - r(lookx) + 16, i << 4, 16, 16);
+				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
 				if(context.fillStyle == '#ccaa44'){
 					context.fillStyle = '#b93';
 					for(k = 1; k <= 3; k++){
-						context.fillRect((j << 4) - r(lookx) + 16 + (seed(j * i + k) * 14), (i << 4) + (seed(j * i / k) * 14), 2, 2);
+						context.fillRect((j << 4) - r(lookx) + (seed(j * i + k) * 14), (i << 4) + (seed(j * i / k) * 14), 2, 2);
 					}
 				}
 			}
 		}
 	}
-	context.fillStyle = '#fee';
+	context.fillStyle = 'rgba(255, 200, 200, 0.7)';
 	for(i in test){
 		context.fillRect((test[i][0] << 4) - lookx, test[i][1] << 4, 16, 16);
 	}
