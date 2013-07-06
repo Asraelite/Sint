@@ -1,4 +1,4 @@
-window.onload = function(){
+﻿window.onload = function(){
 	canvas = document.getElementById('game');
 	context = canvas.getContext('2d');
 	imagesLoading = 0;
@@ -35,6 +35,7 @@ function reset(){
 	particles =  [];
 	ais = [];
 	keys = [];
+	test = [];
 	mouse = {
 		x: 0,
 		y: 0,
@@ -44,23 +45,24 @@ function reset(){
 		shoot1: new Audio('sfx.wav')
 	}
 	game = 'menu';
+	lastspeed = 0;
 	
 	// Create 2 actors
-	actors[0] = new Actor(0, 'player', 200, 3, 48, 16);
+	actors[0] = new Actor(0, 'player', 200, 3, 80, 80);
 	//actors[1] = new Actor(1, 'player', 200, 3, 50, 5);
 	
-	actors[1] = new Actor(6, 'all', 50, 3, 70, 16);
+	//actors[1] = new Actor(6, 'all', 50, 3, 70, 80);
 	
 	// Create player key controllers.
 	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'dark', 100], [83, 'shoot']]);
 	//controllers[1] = new Controller(actors[1], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
 	
-	ais[0] = new Ai(1, 'still');
+	//ais[0] = new Ai(1, 'alphaBot');
 	// type, affiliation, lifespan, xpos, ypos, xvel, yvel
 	particles[0] = new Particle('mouse', 0, 10000000000, 0, 0, 0, 0);
 	
 	camera = [actors[0]]; // Set camera.
-	canvas.style.background = '#fff'; // Set canvas style.
+	canvas.style.background = '#ddf'; // Set canvas style.
 	level = 0 // Set level
 	canvas.style.display = 'block'; // Set up canvas
 	canvas.style.border = '1px solid #ddd';
@@ -75,26 +77,26 @@ function reset(){
 // Define the level.
 levels = [
 			[
-			 '.....................'
-			,'.....................'
-			,'.....................'
-			,'.....................'
-			,'#...................#'
-			,'#...................#'
-			,'#...................#'
-			,'#...................#'
-			,'#...................#'
-			,'#...................#'
-			,'#...................#'
-			,'#...................#'
-			,'#...................#'
-			,'##############.....##'
-			,'##############.....##'
-			,'#####################'
-			,'#####################'
-			,'#####################'
-			,'#####################'
-			,'#####################'
+			 '################################################'
+			,'################################################'
+			,'##............................................##'
+			,'##............................................##'
+			,'##............................................##'
+			,'##............................................##'
+			,'##............................................##'
+			,'##............................................##'
+			,'##............................................##'
+			,'##............................................##'
+			,'##............................................##'
+			,'##..###..##........####..............###########'
+			,'###########........#############################'
+			,'################################################'
+			,'################################################'
+			,'################################################'
+			,'################################################'
+			,'################################################'
+			,'################################################'
+			,'################################################'
 			]
 		]
 
@@ -106,6 +108,11 @@ function animate() {
 // Round a number.
 function r(num){
 	return Math.round(num);
+}
+
+// Generate random number from seed
+function seed(num){
+	return ((num * 467 + ((num * 6) % 9)) % 1000) / 1000;
 }
 
 // Add key pressed to key list.
@@ -215,7 +222,8 @@ function Actor(image, type, health, power, xpos, ypos){
 	this.yvel = 0;
 	this.xvel = 0;
 	this.imageLoad = 2;
-	this.right = this.left = this.up = this.down = false;
+	this.right = this.up = this.down = false;
+	this.left = false;
 	this.x = xpos;
 	this.y = ypos;
 	this.box = new Box(this.x, this.y, 16, 16, this.xvel, this.yvel, ['player', 'pacer']); // Set physics class for this actor
@@ -241,6 +249,7 @@ function Actor(image, type, health, power, xpos, ypos){
 				this.xvel += (0.08 * speed);
 				break;
 			case 'jump':
+				this.yvel = -10;
 				if(this.box.down){
 					this.yvel = -4 - this.power;
 					this.y -= 3;
@@ -263,7 +272,7 @@ function Actor(image, type, health, power, xpos, ypos){
 				particles.push(new Particle(2, 0, 100000, this.x, this.y - 16, this.xvel * 4 + ((Math.random() - 0.5) * 10), -10));
 				break;
 			case 'dark':
-				particles.push(new Particle(3, this.index, 3000, this.x, this.y, this.xvel, this.yvel));
+				particles.push(new Particle(3, this.index, 3000, this.x + (Math.random() * 16), this.y - (Math.random() * 16), this.xvel, this.yvel));
 				this.vars = [false, false, false]
 				break;
 			case 'shoot':
@@ -293,13 +302,13 @@ function Actor(image, type, health, power, xpos, ypos){
 		var drawy = 200;
 		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r(this.y - 16 - looky), 16, 16);
 		context.globalAlpha = 1;
-		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r((216 - (this.y - 216)) - looky), 16, 16);
+		//context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r((216 - (this.y - 216)) - looky), 16, 16);
 		// StartX, StartY, EndX, EndY
 		var gradient = context.createLinearGradient(drawx, r((216 - this.y + 216) - looky - 5), drawx, r((214 - (this.y - 216)) - looky) + 16);
 		gradient.addColorStop(0.1, 'rgba(255, 255, 255, ' + (this.y < 120 ? 1 : ((200 - this.y) / 35) + 0.2) +')');
 		gradient.addColorStop(0.9, 'rgba(255, 255, 255, 1)');
 		context.fillStyle = gradient;
-		context.fillRect(drawx, r((216 - (this.y - 216)) - looky), 16, 16);
+		//context.fillRect(drawx, r((216 - (this.y - 216)) - looky), 16, 16);
 	}
 }
 
@@ -478,7 +487,8 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 	this.width = w;
 	this.height = h;
 	this.col = colgroup;
-	this.left = this.right = this.up = this.down = false;
+	this.right = this.up = this.down = false;
+	this.left = false;
 	
 	this.reset = function(){
 		this.down = this.up = this.left = this.right = false;
@@ -491,11 +501,13 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 		var colareay = ((this.height - 2) >> 4) + 2;
 		var collision = false;
 		var type = 'level';
+		this.left = 'lo';
+		test = [r(this.x)];
 		for(var hr = 0; hr < colareax; hr++){
 			for(var vr = 0; vr < colareay; vr++){
+				test.push([vr, hr]);
 				var xcol = ((this.x - (hr == colareax - 1 ? 1 : 0)) >> 4 + hr);
 				var ycol = ((this.y - (vr == colareay - 1 ? 1 : 0)) >> 4 + vr);
-				this.left
 				if(lv[ycol][xcol] == '#'){
 					collision = true;
 				}
@@ -536,9 +548,9 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 	}
 	
 	this.run = function(){
-		this.move();
 		this.yvel += 0.5;
 		this.xvel *= Math.pow(0.99, speed);
+		this.move();
 	}
 }
 
@@ -578,15 +590,31 @@ function loopGame(){
 		actors[i].simulate();
 		actors[i].draw();
 	}
+	context.globalAlpha = 1;
+	context.lineWidth = 1;
 	for(i in levels[level]){
 		for(j in levels[level][i]){
-			context.globalAlpha = 1;
-			context.lineWidth = 1;
-			context.fillStyle = '#eee';
 			if(levels[level][i][j] == '#'){
-				context.fillRect((j << 4) - lookx, i << 4, 16, 16);
+				//context.fillStyle = ['#aaa', '#bbb', '#ccc', '#ddd', '#eee', '#fff'][Math.floor(Math.random() * 6)];
+				context.fillStyle = '#7a7';
+				if(i > 0){
+					if(levels[level][i - 1][j] == '#'){
+						context.fillStyle = '#ca4';
+					}
+				}
+				context.fillRect((j << 4) - r(lookx) + 16, i << 4, 16, 16);
+				if(context.fillStyle == '#ccaa44'){
+					context.fillStyle = '#b93';
+					for(k = 1; k <= 3; k++){
+						context.fillRect((j << 4) - r(lookx) + 16 + (seed(j * i + k) * 14), (i << 4) + (seed(j * i / k) * 14), 2, 2);
+					}
+				}
 			}
 		}
+	}
+	context.fillStyle = '#fee';
+	for(i in test){
+		context.fillRect((test[i][0] << 4) - lookx, test[i][1] << 4, 16, 16);
 	}
 	context.globalAlpha = 1;
 	context.fillStyle = "#444";
@@ -595,8 +623,13 @@ function loopGame(){
 	context.fillText('Health: ' + actors[0].health, 10, 290);
 	context.fillText('X: ' + r(actors[0].x), 10, 310);
 	context.fillText('Y: ' + r(actors[0].y), 70, 310);
+	lastspeed = (new Date() % 10 == 0 ? r(1000 / speed) : lastspeed);
+	context.fillText('FPS: ' + lastspeed, 10, 20);
 	context.textAlign = 'right';
-	context.fillText('Sint version 0.3 Alpha', 490, 310);
+	context.fillText('Sint version α 0.3.1', 490, 310);
+	context.fillText(test, 490, 290);
+	context.fillText('Actors: ' + actors.length, 490, 20);
+	context.fillText('Particles: ' + particles.length, 490, 40);
 	for(i in ais){
 		ais[i].run();
 	}
