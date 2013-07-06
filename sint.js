@@ -51,13 +51,13 @@ function reset(){
 	actors[0] = new Actor(0, 'player', 200, 3, 80, 80);
 	//actors[1] = new Actor(1, 'player', 200, 3, 50, 5);
 	
-	//actors[1] = new Actor(6, 'all', 50, 3, 70, 80);
+	actors[1] = new Actor(6, 'all', 50, 3, 70, 80);
 	
 	// Create player key controllers.
 	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'dark', 100], [83, 'shoot']]);
 	//controllers[1] = new Controller(actors[1], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
 	
-	//ais[0] = new Ai(1, 'alphaBot');
+	ais[0] = new Ai(1, 'alphaBot');
 	// type, affiliation, lifespan, xpos, ypos, xvel, yvel
 	particles[0] = new Particle('mouse', 0, 10000000000, 0, 0, 0, 0);
 	
@@ -171,6 +171,9 @@ function Ai(index, ai){
 						this.action((this.aivars[0] == 0 ? 'moveRight' : 'moveLeft'));
 					}else{
 						this.action((this.aivars[0] == 0 ? 'moveLeft' : 'moveRight'));
+					}
+					if(actors[index].xvel < 0.1){
+						this.action('jump');
 					}
 					actors[index].xvel *= Math.pow(0.995, speed);
 				}else{
@@ -511,10 +514,9 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 			for(var vr = 0; vr < colareay; vr++){
 				var xcol = (((this.x - (hr == colareax - 1 ? 1 : 0)) >> 4) + hr);
 				var ycol = (((this.y - (vr == colareay - 1 ? 1 : 0)) >> 4) + vr); 
-				if(lv[ycol][xcol] == '#'){
+				if(lv[ycol - 1][xcol] == '#'){
 					collision = true;
 				}
-				test.push([xcol, ycol - 1]);
 			}
 		}
 		
@@ -536,12 +538,11 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 		this.x += this.xvel;
 		if(this.collide() && Math.abs(this.xvel) > 0){
 			this.x = ((this.x >> 4) << 4) + (this.xvel > 0 ? 0 : 16);
-			//this.x = 32;
 			this.xvel = 0;
 		}
 		this.y += this.yvel;
 		if(this.collide()){
-			this.y = ((this.y >> 4) << 4) + (this.yvel > 0 ? 1 : 16);
+			this.y = ((this.y >> 4) << 4) + (this.yvel > 0 ? 0 : 16);
 			if(this.yvel < 0){
 				this.down = true;
 			}
@@ -553,7 +554,9 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 	
 	this.run = function(){
 		this.y += 1;
-		this.yvel += 0.5;
+		if(this.collide() == false){
+			this.yvel += 0.5;
+		}
 		this.y -= 1;
 		this.xvel *= Math.pow(0.99, speed);
 		this.move();
@@ -632,7 +635,7 @@ function loopGame(){
 	lastspeed = (new Date() % 10 == 0 ? r(1000 / speed) : lastspeed);
 	context.fillText('FPS: ' + lastspeed, 10, 20);
 	context.textAlign = 'right';
-	context.fillText('Sint version α 0.3.1', 490, 310);
+	context.fillText('Sint version α 0.3.3', 490, 310);
 	context.fillText(test, 490, 290);
 	context.fillText('Actors: ' + actors.length, 490, 20);
 	context.fillText('Particles: ' + particles.length, 490, 40);
