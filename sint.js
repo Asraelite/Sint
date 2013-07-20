@@ -31,8 +31,8 @@ function reset(){
 	// Create arrays
 	actors = [];
 	controllers = [];
-	controllers = [];
 	particles =  [];
+	camera = [];
 	ais = [];
 	keys = [];
 	test = [];
@@ -44,26 +44,36 @@ function reset(){
 	sound = {
 		shoot1: new Audio('sfx.wav')
 	}
-	game = 'menu';
+	//play();
+	game = 'playing';
+	play();
+	ui = {
+		select : 0,
+		area : 0
+	}
+	menu = [
+		[
+			['Singleplayer', 2, true],
+			['Multiplayer', 3, false],
+			['Options', 1, false]
+		],
+		[
+			['Music', 's', 0, 0, 100, false],
+			['Sound', 's', 0, 0, 100, false],
+		],
+		['r', 'play']
+	]
 	lastspeed = 0;
 	
-	// Create 2 actors
-	actors[0] = new Actor(0, 'player', 200, 3, 80, 80);
-	//actors[1] = new Actor(1, 'player', 200, 3, 50, 5);
 	
-	actors[1] = new Actor(6, 'all', 50, 3, 70, 80);
+	//controllers[1] = new Controller(actors[2], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
 	
-	// Create player key controllers.
-	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'dark', 100], [83, 'shoot']]);
-	//controllers[1] = new Controller(actors[1], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
-	
-	ais[0] = new Ai(1, 'alphaBot');
+	//ais[0] = new Ai(1, 'alphaBot');
 	// type, affiliation, lifespan, xpos, ypos, xvel, yvel
 	particles[0] = new Particle('mouse', 0, 10000000000, 0, 0, 0, 0);
 	
-	camera = [actors[0]]; // Set camera.
-	canvas.style.background = '#ddf'; // Set canvas style.
-	level = 0 // Set level
+	canvas.style.background = '#fff'; // Set canvas style
+	level = 2 // Set level
 	canvas.style.display = 'block'; // Set up canvas
 	canvas.style.border = '1px solid #ddd';
 	spritesheet = new Image(); // Define spritesheet
@@ -74,19 +84,29 @@ function reset(){
 	animate();
 }
 
+function play(){
+	// Create player and its key controller
+	actors[0] = new Actor(0, 'player', 200, 3, 80, 80, 16, 16);
+	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'dark', 100], [83, 'shoot']]);
+	
+	//actors[1] = new Actor(6, 'all', 50, 3, 60, 80);
+	
+	camera = [actors[0]]; // Set camera.
+}
+
 // Define the level.
 levels = [
 			[
 			 '################################################'
 			,'################################################'
-			,'##............................................##'
-			,'##............................................##'
-			,'##............................................##'
-			,'##............................................##'
-			,'##............................................##'
-			,'##............................................##'
-			,'##............................................##'
-			,'##............................................##'
+			,'##..............................................'
+			,'##..............................................'
+			,'##.............................##########.....##'
+			,'##.............................##########.....##'
+			,'##...................####.....................##'
+			,'##...................####.....................##'
+			,'##...........................####.............##'
+			,'##...........................####.............##'
 			,'##............................................##'
 			,'##..###..##........####..............###########'
 			,'###########........#############################'
@@ -97,6 +117,50 @@ levels = [
 			,'################################################'
 			,'################################################'
 			,'################################################'
+			],
+			[
+			 '#################################################'
+			,'#################################################'
+			,'#..............................................##'
+			,'#..............................................##'
+			,'##################.............................##'
+			,'##################....#######..................##'
+			,'#.....................#######..................##'
+			,'#................................#####.........##'
+			,'#................................#####.........##'
+			,'#.....................########.................##'
+			,'#.....................########.................##'
+			,'#............######............................##'
+			,'#............######............................##'
+			,'#......###.....................................##'
+			,'#.....####.....................................##'
+			,'#....#####.....................................##'
+			,'#...######xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx##'
+			,'#..#######xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx##'
+			,'#################################################'
+			,'#################################################'
+			],
+			[
+			 '..................................................................................................................'
+			,'..................................................................................................................'
+			,'..................................................................................................................'
+			,'..................................................................................................................'
+			,'..................................................................................................................'
+			,'..................................................................................................................'
+			,'..................................................................................................................'
+			,'..................................................................................................................'
+			,'........####......................................................................................................'
+			,'........####......................................................................................................'
+			,'........####......................................................................................................'
+			,'##..............................................................................................................##'
+			,'##...............###.............................................................###............................##'
+			,'##...............###............................................................................................##'
+			,'##...............#######........................................................................................##'
+			,'##################################################.....###########################################################'
+			,'##################################################################################################################'
+			,'##################################################################################################################'
+			,'##################################################################################################################'
+			,'##################################################################################################################'
 			]
 		]
 
@@ -217,7 +281,7 @@ function Ai(index, ai){
 }
 
 // Actor class for all solid cubes
-function Actor(image, type, health, power, xpos, ypos){
+function Actor(image, type, health, power, xpos, ypos, width, height){
 	this.image = image;
 	this.group = type;
 	this.health = health;
@@ -229,7 +293,9 @@ function Actor(image, type, health, power, xpos, ypos){
 	this.left = false;
 	this.x = xpos;
 	this.y = ypos;
-	this.box = new Box(this.x, this.y, 16, 16, this.xvel, this.yvel, ['player', 'pacer']); // Set physics class for this actor
+	this.w = width;
+	this.h = height;
+	this.box = new Box(this.x, this.y, this.w, this.h, this.xvel, this.yvel, ['player', 'pacer'], true); // Set physics class for this actor
 	this.oneactions = [];
 	this.actionsturn = [];
 	this.index = actors.length;
@@ -295,15 +361,17 @@ function Actor(image, type, health, power, xpos, ypos){
 		this.y = this.box.y;
 		this.xvel = this.box.xvel;
 		this.yvel = this.box.yvel;
-		
+		if(this.health <= 0){
+			this.health = 0;
+		}
 		//this.xvel *= Math.pow(0.992, speed);
 	}
 	
 	this.draw = function(){
 		var reflect = 100; // Depth reflection goes before fading completely
-		var drawx = r(this.x - lookx);
+		var drawx = r(this.x - lookx + this.xvel);
 		var drawy = 200;
-		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r(this.y - 16 - looky), 16, 16);
+		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r(this.y - 16 - looky), this.w, this.h);
 		context.globalAlpha = 1;
 		//context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r((216 - (this.y - 216)) - looky), 16, 16);
 		// StartX, StartY, EndX, EndY
@@ -331,6 +399,7 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 	var angle = Math.random() * 360;
 	this.addx = Math.sin(angle) * ((particles.length + 200) / 5);
 	this.addy = Math.cos(angle) * ((particles.length + 200) / 10);
+	this.box = new Box(this.x, this.y, this.size, this.size, this.xvel, this.yvel, [], false);
 	
 	this.draw = function(){
 		//context.beginPath();
@@ -373,15 +442,18 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 				context.lineWidth = 1;
 				context.strokeStyle = '#000';
 				context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 4, 4);
+				/*
 				context.strokeStyle = '#aaa';
 				context.strokeRect(r(this.x - lookx) + 0.5, r(213 - (this.y - 216) - looky) + 0.5, 4, 4);
 				context.globalAlpha = 1;
+				*/
 		}
 	}
 	
 	this.onGround = function(){
-		return (this.y > 216 - this.size);
+		return false;
 	}
+	
 	
 	this.simulate = function(){
 		switch(this.type){
@@ -480,11 +552,20 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 		if(thisLoop > this.timeup){
 			this.deleteme = true;
 		}
+		this.box.xvel = this.xvel;
+		this.box.yvel = this.yvel;
+		this.box.x = this.x;
+		this.box.y = this.y + 16;
+		this.box.run();
+		this.x = this.box.x;
+		this.y = this.box.y - 16;
+		this.xvel = this.box.xvel;
+		this.yvel = this.box.yvel;
 	}
 }
 
 // Collision detection class
-function Box(x, y, w, h, xvel, yvel, colgroup){
+function Box(x, y, w, h, xvel, yvel, colgroup, gravity){
 	this.x = x;
 	this.y = y;
 	this.width = w;
@@ -494,6 +575,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 	this.left = false;
 	this.up = false;
 	this.down = false;
+	this.gravity = gravity;
 	
 	this.reset = function(){
 		this.right = false;
@@ -512,10 +594,14 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 		test = [];
 		for(var hr = 0; hr < colareax; hr++){
 			for(var vr = 0; vr < colareay; vr++){
-				var xcol = (((this.x - (hr == colareax - 1 ? 1 : 0)) >> 4) + hr);
-				var ycol = (((this.y - (vr == colareay - 1 ? 1 : 0)) >> 4) + vr); 
-				if(lv[ycol - 1][xcol] == '#'){
-					collision = true;
+				var xcol = (((this.x - (hr == colareax - 1 ? 1 + 16 - (((this.width - 1) % 16) + 1): 0)) >> 4) + hr);
+				var ycol = (((this.y - (vr == colareay - 1 ? 1 + 16 - (((this.height - 1) % 16) + 1) : 0)) >> 4) + vr);
+				if(ycol - 1 >= 0 && ycol <= lv.length){
+					if(xcol >= 0 && xcol < lv[ycol].length){
+						if(lv[ycol - 1][xcol] == '#'){
+						collision = true;
+						}
+					}
 				}
 			}
 		}
@@ -537,12 +623,12 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 		this.down = false;
 		this.x += this.xvel;
 		if(this.collide() && Math.abs(this.xvel) > 0){
-			this.x = ((this.x >> 4) << 4) + (this.xvel > 0 ? 0 : 16);
+			this.x = ((this.x >> 4) << 4) + (this.xvel > 0 ? 16 - (((this.width - 1) % 16) + 1) : 16);
 			this.xvel = 0;
 		}
 		this.y += this.yvel;
 		if(this.collide()){
-			this.y = ((this.y >> 4) << 4) + (this.yvel > 0 ? 0 : 16);
+			this.y = ((this.y >> 4) << 4) + (this.yvel > 0 ? 16 - (((this.height - 1) % 16) + 1) : 16);
 			if(this.yvel < 0){
 				this.down = true;
 			}
@@ -554,7 +640,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup){
 	
 	this.run = function(){
 		this.y += 1;
-		if(this.collide() == false){
+		if(this.collide() == false && this.gravity){
 			this.yvel += 0.5;
 		}
 		this.y -= 1;
@@ -577,12 +663,21 @@ function loopGame(){
 	context.clearRect(0, 0, 500, 350);
 	lookx = looky = 0;
 	looky = -0;
+	for(i in controllers){
+		controllers[i].checkKeys();
+	}
+	for(i in actors){
+		actors[i].simulate();
+	}
 	for(i in camera){
-		lookx += (camera[i] instanceof Array ? camera[i][0] : camera[i].x + camera[i].xvel) - 250;
+		lookx += (camera[i] instanceof Array ? camera[i][0] : camera[i].x + camera[i].xvel * 1) - 250;
 		// looky += (camera[i] == instanceof Array ? camera[i][1] : camera[i].y) - 175;
 	}
 	lookx /= camera.length;
 	looky /= camera.length;
+	for(i in actors){
+		actors[i].draw();
+	}
 	/*
 	if( instanceof Array){
 		lookx = camera[0];
@@ -592,32 +687,25 @@ function loopGame(){
 		looky = 0;
 	}
 	*/
-	for(i in controllers){
-		controllers[i].checkKeys();
-	}
-	for(i in actors){
-		actors[i].simulate();
-		actors[i].draw();
-	}
 	context.globalAlpha = 1;
 	context.lineWidth = 1;
-	for(i in levels[level]){
-		for(j in levels[level][i]){
-			if(levels[level][i][j] == '#'){
-				//context.fillStyle = ['#aaa', '#bbb', '#ccc', '#ddd', '#eee', '#fff'][Math.floor(Math.random() * 6)];
-				context.fillStyle = '#7a7';
-				if(i > 0){
-					if(levels[level][i - 1][j] == '#'){
-						context.fillStyle = '#ca4';
+	for(i = 1; i < levels[level].length; i++){
+		for(j = 1; j < levels[level][i].length; j++){
+			if(levels[level][i][j] == '#' || levels[level][i][j] == 'x'){
+				//#efefef
+				context.fillStyle = '#eee';
+				if((j < levels[level][i].length && j > 0 && i < levels[level].length - 1 && i > 0)){
+					if(levels[level][i][j + 1] != '#' || levels[level][i][j - 1] != '#'){
+						context.fillStyle = '#ddd';
 					}
+					if(levels[level][i + 1][j] != '#' || levels[level][i - 1][j] != '#'){
+						context.fillStyle = '#ddd';
+					}
+				}
+				if(levels[level][i][j] == 'x'){
+					context.fillStyle = '#d77';
 				}
 				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
-				if(context.fillStyle == '#ccaa44'){
-					context.fillStyle = '#b93';
-					for(k = 1; k <= 3; k++){
-						context.fillRect((j << 4) - r(lookx) + (seed(j * i + k) * 14), (i << 4) + (seed(j * i / k) * 14), 2, 2);
-					}
-				}
 			}
 		}
 	}
@@ -629,16 +717,20 @@ function loopGame(){
 	context.fillStyle = "#444";
 	context.font = "10pt Arial";
 	context.textAlign = 'left';
-	context.fillText('Health: ' + actors[0].health, 10, 290);
-	context.fillText('X: ' + r(actors[0].x), 10, 310);
-	context.fillText('Y: ' + r(actors[0].y), 70, 310);
+	if(game == 'playing'){
+		context.fillText('Health: ' + camera[0].health, 10, 290);
+		context.fillText('X: ' + r(camera[0].x), 10, 310);
+		context.fillText('Y: ' + r(camera[0].y), 70, 310);
+	}
 	lastspeed = (new Date() % 10 == 0 ? r(1000 / speed) : lastspeed);
 	context.fillText('FPS: ' + lastspeed, 10, 20);
 	context.textAlign = 'right';
-	context.fillText('Sint version α 0.3.3', 490, 310);
+	context.fillText('Sint version α 0.3.4', 490, 310);
 	context.fillText(test, 490, 290);
-	context.fillText('Actors: ' + actors.length, 490, 20);
-	context.fillText('Particles: ' + particles.length, 490, 40);
+	if(game == 'playing'){
+		context.fillText('Actors: ' + actors.length, 490, 20);
+		context.fillText('Particles: ' + particles.length, 490, 40);
+	}
 	for(i in ais){
 		ais[i].run();
 	}
@@ -650,10 +742,35 @@ function loopGame(){
 			i--;
 		}
 	}
+	if(game == 'menu'){
+		context.font = '40pt Helvetica';
+		context.textAlign = 'center';
+		context.fillStyle = '69d';
+		context.fillText('Sint', 250, 100);
+		if(menu[ui.area][0] == 'r'){
+			switch(menu[ui.area][1]){
+				case 'play':
+					play();
+					game = 'playing';
+					break;
+				default:
+					ui.area = 0;
+					break;
+			}
+		}else{
+			for(i in menu[ui.area]){
+				context.fillStyle = (ui.select == i ? '#9bf' : '#cdf');
+				context.fillRect(150, 150 + (30 * i), 200, 25);
+				context.font = '12pt Helvetica';
+				context.fillStyle = (ui.select == i ? '#fff' : '#eef');
+				context.fillText(menu[ui.area][i][0], 250, 168 + (30 * i));
+			}
+		}
+	}
 	// Slow down game to test low framerates
 	/*
 	for(var j=1; j < 10000000; j++){
 		j = j;
-	}
-	*/
+	}*/
+	
 }
