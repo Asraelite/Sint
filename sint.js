@@ -1,11 +1,4 @@
-﻿window.onload = function(){
-	canvas = document.getElementById('game');
-	context = canvas.getContext('2d');
-	imagesLoading = 0;
-	reset();
-};
-
-window.requestAnimFrame = (function(){
+﻿window.requestAnimFrame = (function(){
 	return  window.requestAnimationFrame	|| 
 		window.webkitRequestAnimationFrame	|| 
 		window.mozRequestAnimationFrame		|| 
@@ -15,6 +8,17 @@ window.requestAnimFrame = (function(){
 			window.setTimeout(callback, 1000 / 60);
 		};
 })();
+
+window.onload = function(){
+	start();
+};
+
+function start(){
+	canvas = document.getElementById('game');
+	context = canvas.getContext('2d');
+	imagesLoading = 0;
+	reset();
+}
 
 // Get mouse position
 function getMouse(evt) {
@@ -36,6 +40,8 @@ function reset(){
 	ais = [];
 	keys = [];
 	test = [];
+	level = [];
+	optionvars = [50, 50];
 	mouse = {
 		x: 0,
 		y: 0,
@@ -44,9 +50,7 @@ function reset(){
 	sound = {
 		shoot1: new Audio('sfx.wav')
 	}
-	//play();
-	game = 'playing';
-	play();
+	game = 'menu';
 	ui = {
 		select : 0,
 		area : 0
@@ -54,14 +58,18 @@ function reset(){
 	menu = [
 		[
 			['Singleplayer', 2, true],
-			['Multiplayer', 3, false],
-			['Options', 1, false]
+			['Multiplayer', 3, true],
+			['Options', 1, true],
+			['Credits', 4, true]
 		],
 		[
 			['Music', 's', 0, 0, 100, false],
-			['Sound', 's', 0, 0, 100, false],
+			['Sound', 's', 1, 0, 100, false],
+			['Back', 0, true]
 		],
-		['r', 'play']
+		['r', 'play'],
+		['r', 'play'],
+		['t', 'Sint', '', 'Programming and graphics by Asraelite', 'Music created in FL Studio by Asraelite']
 	]
 	lastspeed = 0;
 	
@@ -71,11 +79,8 @@ function reset(){
 	//ais[0] = new Ai(1, 'alphaBot');
 	// type, affiliation, lifespan, xpos, ypos, xvel, yvel
 	particles[0] = new Particle('mouse', 0, 10000000000, 0, 0, 0, 0);
-	
-	canvas.style.background = '#fff'; // Set canvas style
+	defineLevels(); // Call function to create level variables
 	level = 2 // Set level
-	canvas.style.display = 'block'; // Set up canvas
-	canvas.style.border = '1px solid #ddd';
 	spritesheet = new Image(); // Define spritesheet
 	spritesheet.src = 'actors.png';
 	document.addEventListener('keydown', keyDown, true); // Add key events
@@ -94,79 +99,60 @@ function play(){
 	camera = [actors[0]]; // Set camera.
 }
 
-// Define the level.
-levels = [
-			[
-			 '################################################'
-			,'################################################'
-			,'##..............................................'
-			,'##..............................................'
-			,'##.............................##########.....##'
-			,'##.............................##########.....##'
-			,'##...................####.....................##'
-			,'##...................####.....................##'
-			,'##...........................####.............##'
-			,'##...........................####.............##'
-			,'##............................................##'
-			,'##..###..##........####..............###########'
-			,'###########........#############################'
-			,'################################################'
-			,'################################################'
-			,'################################################'
-			,'################################################'
-			,'################################################'
-			,'################################################'
-			,'################################################'
-			],
-			[
-			 '#################################################'
-			,'#################################################'
-			,'#..............................................##'
-			,'#..............................................##'
-			,'##################.............................##'
-			,'##################....#######..................##'
-			,'#.....................#######..................##'
-			,'#................................#####.........##'
-			,'#................................#####.........##'
-			,'#.....................########.................##'
-			,'#.....................########.................##'
-			,'#............######............................##'
-			,'#............######............................##'
-			,'#......###.....................................##'
-			,'#.....####.....................................##'
-			,'#....#####.....................................##'
-			,'#...######xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx##'
-			,'#..#######xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx##'
-			,'#################################################'
-			,'#################################################'
-			],
-			[
-			 '..................................................................................................................'
-			,'..................................................................................................................'
-			,'..................................................................................................................'
-			,'..................................................................................................................'
-			,'..................................................................................................................'
-			,'..................................................................................................................'
-			,'..................................................................................................................'
-			,'..................................................................................................................'
-			,'........####......................................................................................................'
-			,'........####......................................................................................................'
-			,'........####......................................................................................................'
-			,'##..............................................................................................................##'
-			,'##...............###.............................................................###............................##'
-			,'##...............###............................................................................................##'
-			,'##...............#######........................................................................................##'
-			,'##################################################.....###########################################################'
-			,'##################################################################################################################'
-			,'##################################################################################################################'
-			,'##################################################################################################################'
-			,'##################################################################################################################'
-			]
-		]
-
 function animate() {
 	requestAnimFrame(animate);
 	loopGame();
+}
+
+// Modified from W3C
+function readFile() {  
+  var file = document.getElementById('file').files[0];
+  if(file){
+    getAsText(file);
+  }
+}
+
+function getAsText(readFile) {
+        
+  var reader = new FileReader();
+  
+  // Read file into memory as UTF-16      
+  reader.readAsText(readFile, "UTF-16");
+  
+  // Handle progress, success, and errors
+  reader.onprogress = updateProgress;
+  reader.onload = loaded;
+  reader.onerror = errorHandler;
+}
+
+function updateProgress(evt) {
+  if (evt.lengthComputable) {
+    // evt.loaded and evt.total are ProgressEvent properties
+    var loaded = (evt.loaded / evt.total);
+    if (loaded < 1) {
+      // Increase the prog bar length
+      // style.width = (loaded * 200) + "px";
+    }
+  }
+}
+
+function loaded(evt) {  
+  // Obtain the read file data    
+  var fileString = evt.target.result;
+  // Handle UTF-16 file dump
+  if(utils.regexp.isChinese(fileString)) {
+    //Chinese Characters + Name validation
+  }
+  else {
+    // run other charset test
+  }
+  // xhr.send(fileString)     
+}
+
+function errorHandler(evt) {
+  if(evt.target.error.name == "NotReadableError") {
+    // The file could not be read
+  }
 }
 
 // Round a number.
@@ -721,11 +707,15 @@ function loopGame(){
 		context.fillText('Health: ' + camera[0].health, 10, 290);
 		context.fillText('X: ' + r(camera[0].x), 10, 310);
 		context.fillText('Y: ' + r(camera[0].y), 70, 310);
+	}else{
+		context.fillText('W and S to move', 10, 270);
+		context.fillText('Enter to select', 10, 290);
+		context.fillText('A and D to change slider value', 10, 310);
 	}
 	lastspeed = (new Date() % 10 == 0 ? r(1000 / speed) : lastspeed);
 	context.fillText('FPS: ' + lastspeed, 10, 20);
 	context.textAlign = 'right';
-	context.fillText('Sint version α 0.3.4', 490, 310);
+	context.fillText('Sint version α 0.4', 490, 310);
 	context.fillText(test, 490, 290);
 	if(game == 'playing'){
 		context.fillText('Actors: ' + actors.length, 490, 20);
@@ -743,27 +733,99 @@ function loopGame(){
 		}
 	}
 	if(game == 'menu'){
+		if(keys.indexOf(83) > -1){
+			if(menudown == false){
+				menudown = true;
+				ui.select += 1;
+			}
+		}else{
+			menudown = false;
+		}
+		if(keys.indexOf(87) > -1){
+			if(menuup == false){
+				menuup = true;
+				ui.select -= 1;
+			}
+		}else{
+			menuup = false;
+		}
+		if(keys.indexOf(13) > -1){
+			if(menuenter == false){
+				menuenter = true;
+				if(menu[ui.area][ui.select][2]){
+					ui.area = menu[ui.area][ui.select][1];
+					ui.select = 0;
+				}else if(menu[ui.area][0] == 't'){
+					ui.area = 0;
+					ui.select = 0;
+				}
+			}
+		}else{
+			menuenter = false;
+		}
+		ui.select = (ui.select + menu[ui.area].length) % menu[ui.area].length;
+		context.fillStyle = '69d';
 		context.font = '40pt Helvetica';
 		context.textAlign = 'center';
-		context.fillStyle = '69d';
 		context.fillText('Sint', 250, 100);
+		// Main menu
 		if(menu[ui.area][0] == 'r'){
 			switch(menu[ui.area][1]){
 				case 'play':
 					play();
 					game = 'playing';
 					break;
+				case 'fractal':
+					game = 'test';
+					break;
 				default:
 					ui.area = 0;
 					break;
 			}
+		}else if(menu[ui.area][0] == 't'){
+					context.fillStyle = '#78a';
+					context.font = '12pt Helvetica';
+					for(i = 1; i < menu[ui.area].length; i++){
+						context.fillText(menu[ui.area][i], 250, 120 + (20 * i));
+					}
+					context.fillStyle = '#9bf';
+					context.fillRect(150, 150 + (20 * i), 200, 25);
+					context.font = '12pt Helvetica';
+					context.fillStyle = '#fff';
+					context.fillText('Back', 250, 168 + (20 * i));
 		}else{
 			for(i in menu[ui.area]){
-				context.fillStyle = (ui.select == i ? '#9bf' : '#cdf');
-				context.fillRect(150, 150 + (30 * i), 200, 25);
-				context.font = '12pt Helvetica';
-				context.fillStyle = (ui.select == i ? '#fff' : '#eef');
-				context.fillText(menu[ui.area][i][0], 250, 168 + (30 * i));
+				if(menu[ui.area][i][1] == 's'){
+					context.fillStyle = (ui.select == i ? '#9bf' : '#cdf');
+					context.fillRect(150, 150 + (30 * i), 80, 25);
+					context.font = '12pt Helvetica';
+					context.fillStyle = (ui.select == i ? '#fff' : '#eef');
+					context.fillText(menu[ui.area][i][0], 190, 168 + (30 * i));
+					context.fillStyle = '#eee';
+					context.strokeStyle = (ui.select == i ? '#cdf' : '#ddf');
+					context.fillRect(240, 160 + (30 * i), 110, 5);
+					context.strokeRect(240, 160 + (30 * i), 110, 5);
+					context.fillStyle = (ui.select == i ? '#9bf' : '#cdf');
+					context.strokeStyle = (ui.select == i ? '#79f' : '#abf');
+					var thisoption = menu[ui.area][i][2];
+					var optionaddx = 100 * (optionvars[thisoption] / (menu[ui.area][i][4] - menu[ui.area][i][3]));
+					context.strokeRect(240 + optionaddx, 155 + (30 * i), 10, 10);
+					context.fillRect(240 + optionaddx, 155 + (30 * i), 10, 10);
+					if(ui.select == i){
+						if(keys.indexOf(65) > -1 && optionvars[thisoption] > menu[ui.area][i][3]){
+							optionvars[thisoption] -= 1;
+						}
+						if(keys.indexOf(68) > -1 && optionvars[thisoption] < menu[ui.area][i][4]){
+							optionvars[thisoption] += 1;
+						}
+					}
+				}else{
+					context.fillStyle = (ui.select == i ? '#9bf' : '#cdf');
+					context.fillRect(150, 150 + (30 * i), 200, 25);
+					context.font = '12pt Helvetica';
+					context.fillStyle = (ui.select == i ? '#fff' : '#eef');
+					context.fillText(menu[ui.area][i][0], 250, 168 + (30 * i));
+				}
 			}
 		}
 	}
@@ -771,6 +833,6 @@ function loopGame(){
 	/*
 	for(var j=1; j < 10000000; j++){
 		j = j;
-	}*/
-	
+	}
+	*/
 }
