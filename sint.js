@@ -40,13 +40,15 @@ function reset(){
 	ais = [];
 	keys = [];
 	test = [];
-	level = [];
+	level = ['','','','','','','','','','','','','','','','','','','',''];
+	partsInserted = [];
 	optionvars = [50, 50];
 	mouse = {
 		x: 0,
 		y: 0,
 		down: false
 	};
+	slow = false;
 	sound = {
 		shoot1: new Audio('sfx.wav')
 	}
@@ -76,11 +78,10 @@ function reset(){
 	
 	//controllers[1] = new Controller(actors[2], [[39, 'moveRight'], [37, 'moveLeft'], [38, 'jump'], [88, 'camera'], [78, 'bounce', 100]]);
 	
-	//ais[0] = new Ai(1, 'alphaBot');
 	// type, affiliation, lifespan, xpos, ypos, xvel, yvel
 	particles[0] = new Particle('mouse', 0, 10000000000, 0, 0, 0, 0);
 	defineLevels(); // Call function to create level variables
-	level = 2 // Set level
+	//level = 2 // Set level
 	spritesheet = new Image(); // Define spritesheet
 	spritesheet.src = 'actors.png';
 	document.addEventListener('keydown', keyDown, true); // Add key events
@@ -94,7 +95,8 @@ function play(){
 	actors[0] = new Actor(0, 'player', 200, 3, 80, 80, 16, 16);
 	controllers[0] = new Controller(actors[0], [[68, 'moveRight'], [65, 'moveLeft'], [87, 'jump'], [67, 'camera'], [77, 'dark', 100], [83, 'shoot']]);
 	
-	//actors[1] = new Actor(6, 'all', 50, 3, 60, 80);
+	//actors[1] = new Actor(6, 'all', 200, 3, 60, 80, 16, 16);
+	//ais[0] = new Ai(1, 'alphaBot');
 	
 	camera = [actors[0]]; // Set camera.
 }
@@ -342,13 +344,19 @@ function Actor(image, type, health, power, xpos, ypos, width, height){
 		this.box.yvel = this.yvel;
 		this.box.x = this.x;
 		this.box.y = this.y;
+		this.box.health = this.health;
 		this.box.run();
 		this.x = this.box.x;
 		this.y = this.box.y;
 		this.xvel = this.box.xvel;
 		this.yvel = this.box.yvel;
+		this.health = this.box.health;
 		if(this.health <= 0){
-			this.health = 0;
+			this.health = 200;
+			for(i = 0; i < 64; i++){
+				particles.push(new Particle(0, 0, 3000, this.x + ((i % 8) * 2), this.y - ((i % 8) * 2), (Math.random() - 0.5) * 4, (Math.random() - 0.8) * 3));
+			}
+			this.y = -500;
 		}
 		//this.xvel *= Math.pow(0.992, speed);
 	}
@@ -403,8 +411,6 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel){
 				context.lineWidth = 1;
 				context.strokeStyle = '#66b';
 				context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 2, 2);
-				context.strokeStyle = '#aaf';
-				context.strokeRect(r(this.x - lookx) + 0.5, r(213 - (this.y - 216) - looky) + 0.5, 2, 2);
 				break;
 			case 1:
 				context.globalAlpha = 1;
@@ -562,6 +568,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity){
 	this.up = false;
 	this.down = false;
 	this.gravity = gravity;
+	this.health = 0;
 	
 	this.reset = function(){
 		this.right = false;
@@ -572,7 +579,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity){
 	
 	this.collide = function(){
 		// Check for collision with level
-		var lv = levels[level];
+		var lv = level;
 		var colareax = ((this.width - 2) >> 4) + 2;
 		var colareay = ((this.height - 2) >> 4) + 2;
 		var collision = false;
@@ -585,7 +592,9 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity){
 				if(ycol - 1 >= 0 && ycol <= lv.length){
 					if(xcol >= 0 && xcol < lv[ycol].length){
 						if(lv[ycol - 1][xcol] == '#'){
-						collision = true;
+							collision = true;
+						}else if(lv[ycol - 1][xcol] == 'x'){
+							this.health -= 0.01 * speed;
 						}
 					}
 				}
@@ -649,6 +658,34 @@ function loopGame(){
 	context.clearRect(0, 0, 500, 350);
 	lookx = looky = 0;
 	looky = -0;
+	var maxx = 0;
+	for(i in actors){
+		if(actors[i].x > maxx){
+			maxx = actors[i].x;
+		}
+	}
+	maxx += 200;
+	while(level[0].length < maxx){
+		partIndex = Math.floor(Math.random() * (levelparts.length - 1)) + 1;
+		partFound = false;
+		if(partsInserted.length == 0){
+			var toInsert = levelparts[0];
+			partsInserted.push([false, '5n', 1, 1, 0]);
+			partFound = true;
+		}else{
+			thisPart = levelparts[partIndex];
+			if(thisPart[20] == partsInserted[partsInserted.length - 1][1] && (Math.random() * thisPart[24]) < 1){
+				partsInserted.push([thisPart[20], thisPart[21], thisPart[22], thisPart[23], thisPart[24]]);
+				toInsert = thisPart;
+				partFound = true;
+			}
+		}
+		if(partFound){
+			for(i = 0; i < 20; i++){
+				level[i] += toInsert[i];
+			}
+		}
+	}
 	for(i in controllers){
 		controllers[i].checkKeys();
 	}
@@ -661,9 +698,6 @@ function loopGame(){
 	}
 	lookx /= camera.length;
 	looky /= camera.length;
-	for(i in actors){
-		actors[i].draw();
-	}
 	/*
 	if( instanceof Array){
 		lookx = camera[0];
@@ -675,20 +709,21 @@ function loopGame(){
 	*/
 	context.globalAlpha = 1;
 	context.lineWidth = 1;
-	for(i = 1; i < levels[level].length; i++){
-		for(j = 1; j < levels[level][i].length; j++){
-			if(levels[level][i][j] == '#' || levels[level][i][j] == 'x'){
+	var lv = level;
+	for(i = 0; i < lv.length; i++){
+		for(j = (lookx > 300 ? r((lookx - 300) / 16) : 0); j < r((lookx + 600) / 16); j++){
+			if(lv[i][j] == '#' || lv[i][j] == 'x'){
 				//#efefef
 				context.fillStyle = '#eee';
-				if((j < levels[level][i].length && j > 0 && i < levels[level].length - 1 && i > 0)){
-					if(levels[level][i][j + 1] != '#' || levels[level][i][j - 1] != '#'){
+				if((j < lv[i].length && j > 0 && i < lv.length - 1 && i > 0)){
+					if(lv[i][j + 1] != '#' || lv[i][j - 1] != '#'){
 						context.fillStyle = '#ddd';
 					}
-					if(levels[level][i + 1][j] != '#' || levels[level][i - 1][j] != '#'){
+					if(lv[i + 1][j] != '#' || lv[i - 1][j] != '#'){
 						context.fillStyle = '#ddd';
 					}
 				}
-				if(levels[level][i][j] == 'x'){
+				if(lv[i][j] == 'x'){
 					context.fillStyle = '#d77';
 				}
 				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
@@ -699,12 +734,15 @@ function loopGame(){
 	for(i in test){
 		context.fillRect((test[i][0] << 4) - lookx, test[i][1] << 4, 16, 16);
 	}
+	for(i in actors){
+		actors[i].draw();
+	}
 	context.globalAlpha = 1;
 	context.fillStyle = "#444";
 	context.font = "10pt Arial";
 	context.textAlign = 'left';
 	if(game == 'playing'){
-		context.fillText('Health: ' + camera[0].health, 10, 290);
+		context.fillText('Health: ' + r(camera[0].health), 10, 290);
 		context.fillText('X: ' + r(camera[0].x), 10, 310);
 		context.fillText('Y: ' + r(camera[0].y), 70, 310);
 	}else{
@@ -715,7 +753,7 @@ function loopGame(){
 	lastspeed = (new Date() % 10 == 0 ? r(1000 / speed) : lastspeed);
 	context.fillText('FPS: ' + lastspeed, 10, 20);
 	context.textAlign = 'right';
-	context.fillText('Sint version α 0.4', 490, 310);
+	context.fillText('Sint version α 0.4.1', 490, 310);
 	context.fillText(test, 490, 290);
 	if(game == 'playing'){
 		context.fillText('Actors: ' + actors.length, 490, 20);
@@ -813,10 +851,10 @@ function loopGame(){
 					context.fillRect(240 + optionaddx, 155 + (30 * i), 10, 10);
 					if(ui.select == i){
 						if(keys.indexOf(65) > -1 && optionvars[thisoption] > menu[ui.area][i][3]){
-							optionvars[thisoption] -= 1;
+							optionvars[thisoption] -= 0.05 * speed;
 						}
 						if(keys.indexOf(68) > -1 && optionvars[thisoption] < menu[ui.area][i][4]){
-							optionvars[thisoption] += 1;
+							optionvars[thisoption] += 0.05 * speed;
 						}
 					}
 				}else{
@@ -830,9 +868,9 @@ function loopGame(){
 		}
 	}
 	// Slow down game to test low framerates
-	/*
-	for(var j=1; j < 10000000; j++){
-		j = j;
+	if(slow){
+		for(var j=1; j < 10000000; j++){
+			j = j;
+		}
 	}
-	*/
 }
