@@ -1,3 +1,9 @@
+/*
+	This was an attempt to create a loading bar type thing to load files 1-by-1.
+	Mainly for when the game had lots of sounds that took a while to load.
+	Didn't work properly and is now obsolete as of version Alpha 0.4.2
+*/
+
 window.onload = function(){
 	canvas = document.getElementById('game');
 	context = canvas.getContext('2d');
