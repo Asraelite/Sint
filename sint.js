@@ -23,6 +23,32 @@ function start(){
 	reset();
 }
 
+function setCookie(name, value, days){
+	var date = new Date();
+	date.setDate(date.getDate() + days);
+	var value = escape(value) + ((days == null) ? "" : "; expires=" + date.toUTCString());
+	document.cookie = name + "=" + value;
+}
+
+function getCookie(name){
+	var value = document.cookie;
+	var start = value.indexOf(" " + name + "=");
+	if (start == -1){
+		start = value.indexOf(name + "=");
+	}
+	if (start == -1){
+		value = null;
+	}else{
+		start = value.indexOf("=", start) + 1;
+		var end = value.indexOf(";", start);
+		if (end == -1){
+			end = value.length;
+		}
+		value = unescape(value.substring(start, end));
+	}
+	return value;
+}
+
 // Get mouse position
 function getMouse(evt){
 	var rect = canvas.getBoundingClientRect();
@@ -50,6 +76,7 @@ function reset(){
 	actors = [];
 	controllers = [];
 	particles =  [];
+	items = [];
 	camera = [];
 	ais = [];
 	keys = [];
@@ -57,10 +84,16 @@ function reset(){
 	test = [];
 	level = ['','','','','','','','','','','','','','','','','','','',''];
 	partsInserted = [];
-	optionvars = [50, 50, 87, 65, 68, 69, 81];
+	var tempCook = getCookie('options');
+	if(tempCook){
+		optionvars = tempCook;
+	}else{
+		optionvars = [50, 50, 87, 65, 68, 69, 81];
+	}
 	game = 'menu';
 	moveLocked = false;
 	lookx = 0;
+	message = false;
 	ui = {
 		select: 0,
 		area: 0
@@ -82,7 +115,6 @@ function reset(){
 	menu = [
 		[
 			['Play', 4, true],
-			//['Multiplayer', 5, true],
 			['Options', 1, true],
 			['Credits', 6, true]
 		],
@@ -102,7 +134,7 @@ function reset(){
 			['Prev', 'c', 6],['Back', 1, true, 120]
 		],
 		[	
-			['Adventure', 5, true],
+			['Adventure', 9, true],
 			['Time trial', 7, true],
 			['Free play', 5, true],
 			['Back', 0, true]
@@ -112,9 +144,11 @@ function reset(){
 		[
 			['"Super Awesome Carrot" by Josh', 8, 0, 'tl'],
 			['"Duck" by Asraelite', 8, 1, 'tl'],
-			['Back', 7, true]
+			['"Pipes by Asraelite', 8, 2, 'tl'],
+			['Back', 4, true]
 		],
-		['r', 'time']
+		['r', 'time'],
+		['r', 'adventure']
 	];
 	lastspeed = 0;
 	
@@ -129,6 +163,8 @@ function reset(){
 	//level = 2 // Set level
 	spritesheet = new Image(); // Define spritesheet
 	spritesheet.src = 'actors.png';
+	itemsheet = new Image(); // Define spritesheet
+	itemsheet.src = 'items.png';
 	document.addEventListener('keydown', keyDown, true); // Add key events
 	document.addEventListener('keyup', keyUp, true);
 	if(mobile){
@@ -150,6 +186,7 @@ function toMenu(){
 	particles =  [];
 	camera = [];
 	ais = [];
+	items = [];
 	keys = [];
 	level = ['','','','','','','','','','','','','','','','','','','',''];
 	partsInserted = [];
@@ -161,11 +198,12 @@ function toMenu(){
 
 function play(){
 	// Create player and its key controller
-	actors[0] = new Actor(0, 'player', 200, 3, 128, 64, 16, 16);
-	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [81, 'suicide', 0]]);
+	actors[0] = new Actor(0, 'player', 200, 200, 3, 128, 64, 16, 16);
+	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next'], [optionvars[6], 'next']]);
 	
-	particles[0] = new Particle('mouse', 0, 10000000000, 0, 0, 0, 0); // Create reticule
-	
+	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule
+	items[0] = new Item(0, 250, 100);
+	//setCookie('options', );
 	finTime = false;
 	
 	camera = [actors[0]]; // Set camera.
@@ -176,30 +214,59 @@ function animate() {
 	loopGame();
 }
 
-// Modified from W3C
-function readFile() {  
-  var file = document.getElementById('file').files[0];
-  if(file){
-    getAsText(file);
-  }
-}
-
-function getAsText(readFile) {
-        
-  var reader = new FileReader();
-  
-  // Read file into memory as UTF-16      
-  reader.readAsText(readFile, "UTF-16");
-  
-  // Handle progress, success, and errors
-  reader.onprogress = updateProgress;
-  reader.onload = loaded;
-  reader.onerror = errorHandler;
-}
-
-// Round a number.
+// Rounds a number.
 function r(num){
 	return Math.round(num);
+}
+
+function spawn(no){
+	for(i = 0 ; i < no; i++){
+		actors[actors.length] = new Actor(7, 'all', 100, 100, 3, lookx + 250 + ((Math.random() - 0.5) * 200), 0, 16, 16);
+		ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+	}
+}
+
+function controlChar(key){
+	var legend = {
+		16 : 'Shift',
+		17 : 'Control',
+		18 : 'Alt',
+		32 : 'Space',
+		37 : 'L-Arrow',
+		38 : 'U-Arrow',
+		39 : 'R-Arrow',
+		40 : 'D-Arrow'
+	}
+	
+	if(key >= 48 && key <= 90){
+		return String.fromCharCode(key);
+	}else{
+		var keyChar = legend[key];
+		return (typeof keyChar === 'undefined' ? key : keyChar);
+	}
+}
+
+// Converts "65324" into "06:53.240" etc.
+function toClock(num, precision){
+	var min = Math.floor(num / 60000);
+	if(min < 10){
+		min = "0" + min;
+	}
+	var sec = num % 60000; // 6163
+	var sec = r(sec / Math.pow(10, 3 - precision));
+	sec = (sec * Math.pow(10, 3 - precision)) / 1000;
+	
+	var disSec = sec;
+	for(i = 0; i < precision; i++){
+		if(sec % 1 / Math.pow(10, i) == 0){
+			disSec += (i == 0 ? ".0" : "0");
+		}
+	}
+	
+	if(sec < 10){
+		disSec = "0" + disSec;
+	}
+	return min + ":" + disSec;
 }
 
 function setStrChar(string , index, letter) {
@@ -254,7 +321,7 @@ function Controller(object, actions){
 					this.actor.action(actions[i][1]);
 				}
 			}
-			if(mouse.click && actions[i][0] == 'c'){
+			if(mouse.down && actions[i][0] == 'c'){
 				this.actor.action(actions[i][1]);
 			}
 		}
@@ -270,50 +337,47 @@ function Ai(index, ai){
 		this.actor.action(act);
 	}
 	this.run = function(){
-		this.actor = actors[index];
 		switch(ai){
-			case 'alphaBot': // Work in progress following melee AI
-				var playerIndex = -1;
+			case 'alphaBot':
 				var topDistance = 400;
 				var distanceAway = Math.abs(actors[0].x - this.actor.x);
-				if((this.aivars[0] == 0 ? distanceAway > 150 : distanceAway < 200)){
-					if(actors[0].x > this.actor.x){
-						this.action((this.aivars[0] == 0 ? 'moveRight' : 'moveLeft'));
+				if(distanceAway < topDistance){
+					if(this.aivars[0] == 1){
+						this.aivars[1] = 120;
 					}else{
-						this.action((this.aivars[0] == 0 ? 'moveLeft' : 'moveRight'));
+						this.aivars[1] = 300;
 					}
-					if(actors[index].xvel < 0.1){
-						this.action('jump');
+					if(this.aivars[0] == 1 && distanceAway < 150){
+						var angle = Math.atan2(actors[0].y - ((this.actor.y) + (distanceAway / 10)), actors[0].x - this.actor.x);
+						this.actor.vars[0] = angle;
+						this.action('en1');
 					}
-					actors[index].xvel *= Math.pow(0.995, speed);
-				}else{
-				
-				}
-				if(Math.random() < 0.03 || this.aivars[2] > 0){
-					if(this.aivars[0] == 0){
-						this.aivars[2] += 1;
-						this.action('dark');
-					}else{
-						this.aivars[0] -= 1;
+					if(this.aivars[0] == 1 && this.actor.energy <= 5){
+						this.aivars[0] = 0;
 					}
-				}
-				if(this.aivars[2] == 75){
-					this.action('jump');
-				}
-				if(this.aivars[2] > 75 && actors[index].yvel >= 0){
-					actors[index].vars = [false, (actors[0].x - this.actor.x) / 15, (actors[0].y - this.actor.y) / 10];
-					this.action('shoot');
-				}
-				if(this.aivars[2] >= 95){
-					this.aivars[0] = 10;
-					this.aivars[1] = 0;
-					this.aivars[2] = 0;
-					actors[index].vars = [false, false, false];
+					if(this.aivars[0] == 0 && this.actor.energy >= 100){
+						this.aivars[0] = 1;
+					}
+					var inverter = (distanceAway > this.aivars[1] ? 0 : 1);
+					if(Math.abs(distanceAway - this.aivars[1]) > 20){
+						if(this.actor.x > actors[0].x){
+							this.action(['moveLeft', 'moveRight'][inverter]);
+						}else{
+							this.action(['moveRight', 'moveLeft'][inverter]);
+						}
+						if(this.actor.x == this.aivars[2]){
+							this.action('jump');
+						}
+						this.aivars[2] = this.actor.x;
+					}
 				}
 				break;
 			case 'pace': // Walking back and forth
 				if(this.actor.xvel == 0){
 					this.aivars[0] = (1 - this.aivars[0]);
+				}
+				if(this.actor.box.inlava){
+					this.action('jump');
 				}
 				this.action(this.aivars[0] == 0 ? 'moveRight' : 'moveLeft');
 				break;
@@ -323,26 +387,42 @@ function Ai(index, ai){
 				this.action('jump');
 				break;
 		}
+		
+		if(this.actor.health < 0){
+			this.deleteme = true;
+			this.actor.deleteme = true;
+			for(i = 0; i < 64; i++){
+				particles.push(new Particle(0, 2, 2, Math.random() * 500 + 2500, this.actor.x + ((i % 8) * 2), this.actor.y - ((i % 8) * 2), (Math.random() - 0.5) * 10, (Math.random() - 0.8) * 10, 0.4, [0.99, 0.99]));
+			}
+			this.actor.x = 0;
+			this.actor.y = 0;
+		}
 	}
 }
 
 // Actor class for all solid cubes
-function Actor(image, type, health, power, xpos, ypos, width, height){
+function Actor(image, type, health, energy, powers, xpos, ypos, width, height, ai){
 	this.image = image;
+	this.ai = typeof ai === 'undefined' ? false : ai;
 	this.group = type;
 	this.health = health;
-	this.power = power;
+	this.maxhealth = health;
+	this.energy = energy;
+	this.maxenergy = energy;
+	this.tookDamage = 0;
+	this.select = 0;
+	this.powers = 1;
 	this.yvel = 0;
 	this.xvel = 0;
 	this.imageLoad = 2;
+	this.deleteme = false;
 	this.right = this.up = this.down = false;
 	this.left = false;
 	this.x = xpos;
 	this.y = ypos;
 	this.w = width;
 	this.h = height;
-	//this.box = new Box(this.x, this.y, this.w, this.h, this.xvel, this.yvel, ['player', 'pacer'], true); // Set physics class for this actor
-	this.box = new Box(this.x, this.y, this.w, this.h, this.xvel, this.yvel, [], true);
+	this.box = new Box(this.x, this.y, this.w, this.h, this.xvel, this.yvel, 0, true);
 	this.oneactions = [];
 	this.actionsturn = [];
 	this.index = actors.length;
@@ -358,57 +438,63 @@ function Actor(image, type, health, power, xpos, ypos, width, height){
 	
 	// Actions to call from controllers
 	this.action = function(type){
-		switch(type){
-			case 'moveLeft':
-				this.xvel -= (0.08 * speed);
-				break;
-			case 'moveRight':
-				this.xvel += (0.08 * speed);
-				break;
-			case 'jump':
-				this.box.y += 1;
-				if(this.box.collide() || this.box.inlava){
-					this.yvel = (-4 - this.power) * (this.box.inlava ? 0.2 : 1);
-					distanceToSound = Math.abs(this.x - lookx - 250);
-					if(distanceToSound < 300){
-						sound.jump.volume = (r(distanceToSound < 100 ? 1 : (300 - distanceToSound) / 200) * optionvars[1]) / 100;
-						sound.jump.play();
+		if(!message){
+			var angle = Math.atan2(-(this.y - mouse.y), (mouse.x - ((this.x - lookx))));
+			var distanceToSound = Math.abs(this.x - lookx - 250);
+			switch(type){
+				case 0:
+					if(this.energy >= 2){
+						particles.push(new Particle(0, 0, 0, Math.random() * 500 + 5000, this.x + 8, this.y - 8, Math.cos(angle) * 15 + this.xvel, Math.sin(angle) * 15 + this.yvel, 0.4, [0.997, 0.997]));
+						if(distanceToSound < 500){
+							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+							sound.shoot1.play();
+						}
+						this.energy -= 2;
 					}
-				}
-				this.box.y -= 1;
-				break;
-			case 'melee':
-				this.yvel = 10;
-				break;
-			case 'camera':
-				camera = [this];
-				break;
-			case 'stream':
-				var angle = Math.atan2((this.y) - mouse.y, mouse.x - (this.x - lookx));
-				particles.push(new Particle(0, 0, 9000, this.x + 8, this.y - 8, Math.sin(angle) * 15, Math.cos(angle) * 15));
-				sound.shoot1.volume = r(optionvars[1]) / 100;
-				sound.shoot1.play();
-				break;
-			case 'bounce':
-				particles.push(new Particle(1, 0, 5000, this.x, this.y - 1, this.xvel * 2 + ((Math.random() - 0.5) * 5), 1));
-				break;
-			case 'flo':
-				particles.push(new Particle(2, 0, 100000, this.x, this.y - 16, this.xvel * 4 + ((Math.random() - 0.5) * 10), -10));
-				break;
-			case 'dark':
-				particles.push(new Particle(3, this.index, 3000, this.x + (Math.random() * 16), this.y - (Math.random() * 16), this.xvel, this.yvel));
-				this.vars = [false, false, false]
-				break;
-			case 'shoot':
-				this.vars = [true, this.vars[1], this.vars[2]];
-				break;
-			case 'suicide':
-				this.health = (this.y > 50 ? 0 : this.health);
-				clockStart = new Date().getTime();
-				break;
-			case 'quit':
-				tomenu = true;
-				break;
+					break;
+				case 'en1':
+					if(this.energy >= 2){
+						particles.push(new Particle(0, 1, 1, Math.random() * 500 + 5000, this.x + 8, this.y - 8, Math.cos(this.vars[0]) * 15 + this.xvel, Math.sin(this.vars[0]) * 15 + this.yvel, 0.4, [0.995, 0.995]));
+						if(distanceToSound < 500){
+							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+							sound.shoot1.play();
+						}
+						this.energy -= 2;
+					}
+					break;
+				case 'moveLeft':
+					this.xvel -= (0.08 * speed);
+					break;
+				case 'moveRight':
+					this.xvel += (0.08 * speed);
+					break;
+				case 'jump':
+					this.box.y += 1;
+					if(this.box.collide() || this.box.inlava){
+						this.yvel = -6.8 * (this.box.inlava ? 0.2 : 1);
+						if(distanceToSound < 300){
+							sound.jump.volume = (r(distanceToSound < 100 ? 1 : (300 - distanceToSound) / 200) * optionvars[1]) / 100;
+							sound.jump.play();
+						}
+					}
+					this.box.y -= 1;
+					break;
+				case 'current':
+					this.action(this.select);
+					break;
+				case 'next':
+					this.select = (this.select + 1) % this.powers;
+					break;
+				case 'prev':
+					this.select = (this.select <= 0 ? this.powers : this.select - 1);
+					break;
+				case 'suicide':
+					this.health = (this.y > 50 ? 0 : this.health);
+					break;
+				case 'quit':
+					tomenu = true;
+					break;
+			}
 		}
 		this.actionsturn.push(type);
 	}
@@ -426,39 +512,93 @@ function Actor(image, type, health, power, xpos, ypos, width, height){
 		this.yvel = this.box.yvel;
 		this.health = this.box.health;
 		if(this.health <= 0){
-			this.health = 200;
-			for(i = 0; i < 64; i++){
-				particles.push(new Particle(0, 0, Math.random() * 500 + 2500, this.x + ((i % 8) * 2), this.y - ((i % 8) * 2), (Math.random() - 0.5) * 10, (Math.random() - 0.8) * 10), true);
+			if(this.image == 0){
+				messsage = ['', 'Shuffleshit, yo'];
+				for(i = 0; i < 64; i++){
+					particles.push(new Particle(0, 0, 0, Math.random() * 500 + 2500, this.x + ((i % 8) * 2), this.y - ((i % 8) * 2), (Math.random() - 0.5) * 10, (Math.random() - 0.8) * 10, 0.4, [0.99, 0.99]));
+				}
+				this.x = 128;
+				this.y = 64;
+				this.xvel = 0;
+				this.yvel = 0;
+				this.health = this.maxhealth;
+				clockStart = new Date().getTime();
 			}
-			this.y = 0;
-			this.x = 128;
+		}
+		if(this.energy >= this.maxenergy){
+			this.energy = this.maxenergy;
+		}else{
+			this.energy += 0.04 * speed;
 		}
 		//this.xvel *= Math.pow(0.992, speed);
 	}
 	
 	this.draw = function(){
-		var reflect = 100; // Depth reflection goes before fading completely
+		//var reflect = 100; // Depth reflection goes before fading completely
 		var drawx = r(this.x - lookx + this.xvel);
 		var drawy = 200;
 		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r(this.y - 16 - looky), this.w, this.h);
 		context.globalAlpha = 1;
+		if(this.tookDamage > 0 && this.image != 0){
+			context.strokeStyle = '#555';
+			context.fillStyle = '#c54';
+			context.fillRect(r((this.x - lookx) + 8 + this.xvel) - 10 - 0.5, r(this.y) - 23.5, (this.health / this.maxhealth) * 20, 5);
+			context.strokeRect(r((this.x - lookx) + 8 + this.xvel) - 10 - 0.5, r(this.y) - 23.5, 20, 5);
+			this.tookDamage -= 0.05 * speed;
+		}
 		//context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r((216 - (this.y - 216)) - looky), 16, 16);
 		// StartX, StartY, EndX, EndY
-		var gradient = context.createLinearGradient(drawx, r((216 - this.y + 216) - looky - 5), drawx, r((214 - (this.y - 216)) - looky) + 16);
-		gradient.addColorStop(0.1, 'rgba(255, 255, 255, ' + (this.y < 120 ? 1 : ((200 - this.y) / 35) + 0.2) +')');
-		gradient.addColorStop(0.9, 'rgba(255, 255, 255, 1)');
-		context.fillStyle = gradient;
+		//var gradient = context.createLinearGradient(drawx, r((216 - this.y + 216) - looky - 5), drawx, r((214 - (this.y - 216)) - looky) + 16);
+		//gradient.addColorStop(0.1, 'rgba(255, 255, 255, ' + (this.y < 120 ? 1 : ((200 - this.y) / 35) + 0.2) +')');
+		//gradient.addColorStop(0.9, 'rgba(255, 255, 255, 1)');
+		//context.fillStyle = gradient;
 		//context.fillRect(drawx, r((216 - (this.y - 216)) - looky), 16, 16);
 	}
 }
 
-function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel, gravity){
-	this.gravity = typeof gravty !== 'undefined' ? gravity : true;
+function Item(type, xpos, ypos){
 	this.x = xpos;
 	this.y = ypos;
+	this.hover = 0;
+	this.hovervel = 0.1;
+	this.deleteme = false;
+	
+	this.draw = function(){
+		var drawx = r(this.x - lookx + this.xvel);
+		context.drawImage(itemsheet, this.type * 8, 0, 8, 8, drawx, this.x, 8, 8);		
+		context.globalAlpha = 1;
+	}
+	
+	this.run = function(){
+		this.hover += this.hovervel;
+		if((4 - Math.abs(this.hover)) <= 0){
+			this.hovervel *= -1;
+		}
+		if(Math.abs((this.x + 4) - (actors[0].x + 8)) < 10 && Math.abs((this.y + 4) - (actors[0].y + 8)) < 10){
+			switch(this.type){
+				case 0:
+					actors[0].health += 100;
+					if(actors[0].health > actors[0].maxhealth){
+						actors[0].health = actors[0].maxhealth;
+					}
+					break;
+				case 1:
+					
+					break;
+			}
+		}
+	}
+}
+
+function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel, gravity, airRes){
+	this.gravity = typeof gravty !== 'undefined' ? gravity : 1;
+	this.x = xpos;
+	this.y = ypos;
+	this.drawType = drawType;
 	this.xvel = xvel;
 	this.yvel = yvel;
 	this.type = type;
+	this.air = airRes;
 	this.life = lifespan;
 	this.size = [3, 5, 7, 5][type];
 	this.created = this.timeup = new Date();
@@ -469,14 +609,19 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel, gravity){
 	var angle = Math.random() * 360;
 	this.addx = Math.sin(angle) * ((particles.length + 200) / 5);
 	this.addy = Math.cos(angle) * ((particles.length + 200) / 10);
-	this.box = new Box(this.x, this.y, this.size, this.size, this.xvel, this.yvel, [], gravity);
+	this.box = new Box(this.x, this.y, this.size, this.size, this.xvel, this.yvel, 1, gravity, this.air);
 	this.box.unstuck();
 	
+	this.drawBox = function(alpha, width, color, size){
+		context.globalAlpha = alpha;
+		context.lineWidth = width;
+		context.strokeStyle = color;
+		context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, size, size);
+	};
+	
 	this.draw = function(){
-		//context.beginPath();
-		//context.rect(this.x, this.y, 3, 3);
 		if(this.x > lookx - 50 && this.x < lookx + 550 && this.y < 300 && this.y > -50){
-			switch(this.type){
+			switch(this.drawType){
 				case 'mouse':
 					context.globalAlpha = 0.7;
 					context.lineWidth = 2;
@@ -484,28 +629,20 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel, gravity){
 					context.strokeRect(mouse.x - this.vars[0] / 2, mouse.y - this.vars[0] / 2, this.vars[0], this.vars[0]);
 					break;
 				case 0:
-					context.globalAlpha = 1;
-					context.lineWidth = 1;
-					context.strokeStyle = '#66b';
-					context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 2, 2);
+					this.drawBox(1, 1, '#66b', 2);
 					break;
 				case 1:
-					context.globalAlpha = 1;
-					context.lineWidth = 2;
-					context.strokeStyle = '#b79';
-					context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 4, 4);
+					this.drawBox(1, 1, '#f87', 2);
 					break;
 				case 2:
-					context.globalAlpha = 0.2;
-					context.lineWidth = 1;
-					context.strokeStyle = '#363';
-					context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 5, 5);
+					this.drawBox(1, 1, '#655', 2);
 					break;
 				case 3:
 					context.globalAlpha = 0.5;
 					context.lineWidth = 1;
 					context.strokeStyle = '#000';
-					context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 4, 4);ha = 1;
+					context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 4, 4);
+					break;
 			}
 			context.globalAlpha = 1;
 		}
@@ -530,9 +667,7 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel, gravity){
 				}
 				this.x = lookx;
 				if(mouse.down){
-					if(!mobile){
-						particles.push(new Particle(0, 0, 9000, lookx + mouse.x, mouse.y, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5));
-					}else{
+					if(mobile){
 						if(mouse.y < 100){
 							actors[0].action('jump');
 						}
@@ -546,18 +681,35 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel, gravity){
 				}
 				break;
 			case 0:
+				/*
 				for(j in actors){
 					if(Math.abs(this.x - (actors[j].x + 8)) < 20 && Math.abs(this.y - (actors[j].y + 8)) < 20){
 						this.xvel += (20 - Math.abs(this.x - (actors[j].x + 8))) / (this.x > (actors[j].x + 8) ? 5 : -5);
 						this.yvel += (20 - Math.abs(this.y - (actors[j].y + 8))) / (this.y > (actors[j].y + 8) ? 5 : -5);
 					}
 				}
+				*/
 				break;
 			case 1:
 			
 			default:
 				break;
 		}
+		
+		for(j in actors){
+			var act = actors[j];
+			if(this.y + 16 < act.y + act.h && this.y + 16 + this.size > act.y){
+				if(this.x + this.size > act.x && this.x < act.x + act.w && (this.aff == 1 ? j == 0 : j > 0)){
+					actors[j].health -= (Math.abs(this.xvel) + Math.abs(this.yvel)) / 10;
+					actors[j].xvel += this.xvel / 8;
+					actors[j].yvel += this.yvel / 8;
+					actors[j].tookDamage = 40;
+					this.deleteme = true;
+				}
+			}
+		}
+		// this.y < obj.y + obj.h && this.y + obj.h > obj.y && this.x + obj.w > obj.x && this.x < obj.x + obj.w && obj.box != this)
+		
 		if(thisLoop > this.timeup){
 			this.deleteme = true;
 		}
@@ -574,7 +726,7 @@ function Particle(type, affiliation, lifespan, xpos, ypos, xvel, yvel, gravity){
 }
 
 // Collision detection class
-function Box(x, y, w, h, xvel, yvel, colgroup, gravity){
+function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 	this.x = x;
 	this.y = y;
 	this.width = w;
@@ -585,6 +737,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity){
 	this.up = false;
 	this.down = false;
 	this.gravity = gravity;
+	this.air = (typeof airRes === 'undefined' ? [0.99, 1] : airRes);
 	this.health = 0;
 	this.inlava = false;
 	
@@ -624,17 +777,29 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity){
 							this.xvel *= Math.pow(0.999, speed);
 							this.yvel *= Math.pow(0.999, speed);
 						}else if(lv[ycol - 1][xcol] == 'F'){
+							if(trialComplete == false){
+								var time = r((new Date().getTime() - clockStart));
+								finTime = toClock(time, 3);
+								rawFinTime = time;
+								var record = getCookie('trial record: ' + levelNo);
+								if(rawFinTime < record || !record){
+									setCookie('trial record: ' + levelNo, rawFinTime, 30);
+									record = rawFinTime;
+								}
+								message = ['Level completed', 'Time : ' + finTime, 'Record : ' + toClock(record, 3)];
+							}
 							trialComplete = true;
 						}
 					}
 				}
 			}
 		}
-		
-		for(j in actors){
-			var obj = actors[j];
-			if(this.y < obj.y + obj.h && this.y + obj.h > obj.y && this.x + obj.w > obj.x && this.x < obj.x + obj.w && obj.box != this){
-				collision = true;
+		if(this.col == 0){
+			for(j in actors){
+				var obj = actors[j];
+				if(this.y < obj.y + obj.h && this.y + obj.h > obj.y && this.x + obj.w > obj.x && this.x < obj.x + obj.w && obj.box != this){
+					collision = true;
+				}
 			}
 		}
 		
@@ -711,13 +876,11 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity){
 	this.run = function(){
 		this.y += 1;
 		if(this.collide() == false && this.gravity){
-			this.yvel += 0.025 * speed;
+			this.yvel += (0.025 * gravity) * speed;
 		}
 		this.y -= 1;
-		this.xvel *= Math.pow(0.99, speed);
-		if(!this.gravity){
-			this.yvel *= Math.pow(0.99, speed);
-		}
+		this.xvel *= Math.pow(this.air[0], speed);
+		this.yvel *= Math.pow(this.air[1], speed);
 		this.move();
 	}
 }
@@ -737,7 +900,7 @@ function loopGame(){
 	limitLeft = 16;
 	limitRight = 16;
 	if(game == 'playing'){
-		if(gameMode == 'free'){
+		if(gameMode == 'free' || gameMode == 'adventure'){
 			var maxx = 0;
 			for(i in actors){
 				if(actors[i].x > maxx){
@@ -755,9 +918,11 @@ function loopGame(){
 				}else{
 					thisPart = levelparts[partIndex];
 					if(thisPart[20] == partsInserted[partsInserted.length - 1][1] && (Math.random() * thisPart[24]) < 1){
-						partsInserted.push([thisPart[20], thisPart[21], thisPart[22], thisPart[23], thisPart[24]]);
-						toInsert = thisPart;
-						partFound = true;
+						if(partsInserted[partsInserted.length - 1] != thisPart || Math.random() < 0){
+							partsInserted.push([thisPart[20], thisPart[21], thisPart[22], thisPart[23], thisPart[24]]);
+							toInsert = thisPart;
+							partFound = true;
+						}
 					}
 				}
 				if(partFound){
@@ -765,6 +930,9 @@ function loopGame(){
 						level[i] += toInsert[i];
 					}
 				}
+			}
+			if(gameMode == 'adventure'){
+				limitRight = 200000;
 			}
 		}else if(gameMode == 'time'){
 			level = timelevels[levelNo];
@@ -774,14 +942,10 @@ function loopGame(){
 	for(i in controllers){
 		controllers[i].checkKeys();
 	}
-	for(i in actors){
-		actors[i].simulate();
-	}
 	lookx = 0
 	looky = 0;
 	for(i in camera){
 		lookx += (camera[i] instanceof Array ? camera[i][0] : camera[i].x + camera[i].xvel * 1) - 250;
-		// looky += (camera[i] == instanceof Array ? camera[i][1] : camera[i].y) - 175;
 	}
 	lookx /= camera.length;
 	looky /= camera.length;
@@ -821,8 +985,8 @@ function loopGame(){
 				}
 				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
 			}else if(lv[i][j] == 'E'){
-				actors[actors.length] = new Actor(6, 'all', 200, 3, j << 4, i << 4, 16, 16);
-				ais[ais.length] = new Ai(actors.length - 1, 'pace');
+				actors[actors.length] = new Actor(6, 'all', 100, 100, 3, j << 4, i << 4, 16, 16);
+				ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
 				level[i] = setStrChar(level[i], j, '.');
 			}
 		}
@@ -841,11 +1005,14 @@ function loopGame(){
 	context.font = "10pt Arial";
 	context.textAlign = 'left';
 	if(game == 'playing'){
-		context.fillText('Health: ' + r(camera[0].health), 10, 270);
-		context.fillText('X: ' + r(camera[0].x), 10, 290);
-		context.fillText('Y: ' + r(camera[0].y), 70, 290);
-		context.fillText('Xvel: ' + r(camera[0].xvel * 10) / 10, 10, 310);
-		context.fillText('Yvel: ' + r(camera[0].yvel * 10) / 10, 70, 310);
+		context.strokeStyle = '#555';
+		context.fillStyle = '#c54';
+		context.fillRect(10, 285, camera[0].health / 2, 10);
+		context.strokeRect(10, 285, camera[0].maxhealth / 2, 10);
+		context.fillStyle = '#68f';
+		context.fillRect(10, 300, camera[0].energy / 2, 10);
+		context.strokeRect(10, 300, camera[0].maxenergy / 2, 10);
+		context.fillStyle = '#444';
 	}else{
 		context.fillText('W and S to move', 10, 270);
 		context.fillText('Enter to select', 10, 290);
@@ -855,47 +1022,65 @@ function loopGame(){
 	context.fillText('FPS: ' + lastspeed, 10, 20);
 	if(game == 'playing'){
 		if(gameMode == 'time'){
-			var time = r((new Date().getTime() - clockStart)) / 1000;
-			if(trialComplete && !finTime){
-				finTime = (Math.floor(time / 60) + ':' + (r(time % 60) < 10 ? '0' + r(time % 60) : r(time % 60)));
+			var time = r((new Date().getTime() - clockStart));
+			if(trialComplete && !message){
+				toMenu();
+				ui.area = 7;
+				ui.select = levelNo;
 			}
-			context.fillText('Time: ' + (finTime ? finTime : (Math.floor(time / 60) + ':' + (r(time % 60) < 10 ? '0' + r(time % 60) : r(time % 60)))), 10, 40);
+			context.fillText('Time: ' + (finTime ? finTime : toClock(time, 1)), 10, 40);
+		}else{
+			trialComplete = false;
 		}
+	}else{
+		trialComplete = false;
 	}
 	context.textAlign = 'right';
 	if(mobile){
 		context.fillText('RetX: ' + r(mouse.x), 420, 290);
 		context.fillText('RetX: ' + r(mouse.y), 490, 290);
-		context.fillText('Sint mobile version α 0.5', 490, 310);
+		context.fillText('Sint mobile version α 0.6', 490, 310);
 	}else{
-		context.fillText('Sint version α 0.5', 490, 310);
+		context.fillText('Sint version α 0.6', 490, 20); // β
 	}
 	context.fillText(test, 490, 290);
-	if(game == 'playing'){
-		context.fillText('Actors: ' + actors.length, 490, 20);
-		context.fillText('Particles: ' + particles.length, 490, 40);
-		context.fillText(r(lookx), 490, 60);
-		context.fillText(actors[0].test, 490, 80);
-	}
 	for(i in ais){
 		if(Math.abs(ais[i].actor.x - lookx) < 2000){
 			ais[i].run();
 		}
 	}
+	for(i in actors){
+		actors[i].simulate();
+	}
 	for(i in particles){
-		try{
-			particles[i].simulate();
-			particles[i]. draw();
-		}catch(err){
-			particles.splice(i, 1);
-			i--;
-			console.error('Particle error');
+		particles[i].simulate();
+		particles[i]. draw();
+	}
+	for(i in items){
+		items[i].run();
+		items[i].draw();
+	}
+	
+	
+	if(message){
+		context.strokeStyle = '#555';
+		context.fillStyle = '#ccc';
+		context.fillRect(100, 100, 300, 120);
+		context.strokeRect(100, 100, 300, 120);
+		context.textAlign = 'center';
+		context.fillStyle = '#9bf';
+		context.fillRect(150, 180, 200, 25);
+		context.font = '12pt Helvetica';
+		context.fillStyle = '#fff';
+		context.fillText('Enter to Continue', 250, 198);
+		for(j = 0; j < message.length; j++){
+			context.fillText(message[j], 250, 130 + (20 * j));
 		}
-		if(particles[i].deleteme || particles.length > 3000){
-			particles.splice(i, 1);
-			i--;
+		if(keysDown.indexOf(13) > -1){
+			message = false;
 		}
 	}
+	
 	if(game == 'menu'){
 		if(keysDown.indexOf(83) > -1 && moveLocked == false){
 			ui.select += 1;
@@ -936,6 +1121,13 @@ function loopGame(){
 					clockStart = new Date().getTime();
 					game = 'playing';
 					gameMode = 'time';
+					break;
+				case 'adventure':
+					play();
+					var controls = controlChar(optionvars[2]) + ", " + controlChar(optionvars[3]) + " and " + controlChar(optionvars[4]);
+					message = ['Use ' + controls + ' to move', 'Mouse to aim and click to shoot', 'Get past level 20 to win'];
+					game = 'playing';
+					gameMode = 'adventure';
 					break;
 				default:
 					ui.area = 0;
@@ -996,9 +1188,7 @@ function loopGame(){
 					context.fillRect(240, 120 + (30 * i), 110, 25);
 					context.fillStyle = (ui.select == i ? '#fff' : '#eef');
 					var tempIn = optionvars[parseInt(i) + 2];
-					if(tempIn > 47){
-						tempIn = String.fromCharCode(tempIn);
-					}
+					tempIn = controlChar(tempIn);
 					if(tempIn == 0){
 						tempIn = 'Enter key';
 					}
@@ -1040,6 +1230,31 @@ function loopGame(){
 				ui.area = menu[ui.area][ui.select][1];
 				ui.select = 0;
 			}
+		}
+	}
+	
+	var len = 0;
+	if(actors.length > len){
+		len = actors.length;
+	}
+	if(particles.length > len){
+		len = particles.length;
+	}
+	if(items.length > len){
+		len = items.length;
+	}
+	for(i = 0; i < len; i++){
+		if(actors.length > i && actors[i].deleteme){
+			actors.splice(i, 1);
+		}
+		if(ais.length > i && ais[i].deleteme){
+			ais.splice(i, 1);
+		}
+		if(particles.length > i && particles[i].deleteme){
+			particles.splice(i, 1);
+		}
+		if(items.length > i && items[i].deleteme){
+			items.splice(i, 1);
 		}
 	}
 	
