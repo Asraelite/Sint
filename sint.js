@@ -62,7 +62,6 @@ function getMouse(evt){
 function getTouch(evt){
 	var rect = canvas.getBoundingClientRect();
 	var touch = evt.touches[0];
-	console.log(touch);
 	evt.preventDefault();
 	return {
 		x: touch.clientX - rect.left,
@@ -83,6 +82,7 @@ function reset(){
 	keysDown = [];
 	test = [];
 	level = ['','','','','','','','','','','','','','','','','','','',''];
+	score = 0;
 	partsInserted = [];
 	var tempCook = getCookie('options');
 	if(tempCook){
@@ -116,6 +116,7 @@ function reset(){
 		[
 			['Play', 4, true],
 			['Options', 1, true],
+			//['Level Editor', 10, true],
 			['Credits', 6, true]
 		],
 		[
@@ -193,6 +194,7 @@ function toMenu(){
 	game = 'menu';
 	ui.area = 0;
 	ui.select = 0;
+	score = 0;
 	tomenu = false;
 }
 
@@ -202,7 +204,6 @@ function play(){
 	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next'], [optionvars[6], 'next']]);
 	
 	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule
-	items[0] = new Item(0, 250, 100);
 	//setCookie('options', );
 	finTime = false;
 	
@@ -224,6 +225,11 @@ function spawn(no){
 		actors[actors.length] = new Actor(7, 'all', 100, 100, 3, lookx + 250 + ((Math.random() - 0.5) * 200), 0, 16, 16);
 		ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
 	}
+}
+
+function butcher(){
+	actors = [actors[0]];
+	ais = [];
 }
 
 function controlChar(key){
@@ -355,11 +361,11 @@ function Ai(index, ai){
 					if(this.aivars[0] == 1 && this.actor.energy <= 5){
 						this.aivars[0] = 0;
 					}
-					if(this.aivars[0] == 0 && this.actor.energy >= 100){
+					if(this.aivars[0] == 0 && this.actor.energy >= this.actor.maxenergy){
 						this.aivars[0] = 1;
 					}
 					var inverter = (distanceAway > this.aivars[1] ? 0 : 1);
-					if(Math.abs(distanceAway - this.aivars[1]) > 20){
+					if(Math.abs(distanceAway - this.aivars[1]) > 20 && Math.random() < 0.9){
 						if(this.actor.x > actors[0].x){
 							this.action(['moveLeft', 'moveRight'][inverter]);
 						}else{
@@ -522,6 +528,7 @@ function Actor(image, type, health, energy, powers, xpos, ypos, width, height, a
 				this.xvel = 0;
 				this.yvel = 0;
 				this.health = this.maxhealth;
+				score -= 50;
 				clockStart = new Date().getTime();
 			}
 		}
@@ -559,32 +566,43 @@ function Actor(image, type, health, energy, powers, xpos, ypos, width, height, a
 function Item(type, xpos, ypos){
 	this.x = xpos;
 	this.y = ypos;
+	this.type = type;
 	this.hover = 0;
-	this.hovervel = 0.1;
 	this.deleteme = false;
 	
 	this.draw = function(){
-		var drawx = r(this.x - lookx + this.xvel);
-		context.drawImage(itemsheet, this.type * 8, 0, 8, 8, drawx, this.x, 8, 8);		
+		var drawx = r(this.x - lookx);
+		context.drawImage(itemsheet, this.type * 16, 0, 16, 16, drawx, r(this.y + r(Math.sin(this.hover) * 2)), 16, 16);
 		context.globalAlpha = 1;
 	}
 	
 	this.run = function(){
-		this.hover += this.hovervel;
-		if((4 - Math.abs(this.hover)) <= 0){
-			this.hovervel *= -1;
-		}
-		if(Math.abs((this.x + 4) - (actors[0].x + 8)) < 10 && Math.abs((this.y + 4) - (actors[0].y + 8)) < 10){
-			switch(this.type){
-				case 0:
-					actors[0].health += 100;
-					if(actors[0].health > actors[0].maxhealth){
-						actors[0].health = actors[0].maxhealth;
-					}
-					break;
-				case 1:
-					
-					break;
+		this.hover += 0.005 * speed;
+		act = actors[0];
+		if(this.y + 16 < act.y + act.h && this.y + 32 > act.y){
+			if(this.x + 16 > act.x && this.x < act.x + act.w){
+				console.log(this.deleteme);
+				switch(this.type){
+					case 0:
+						actors[0].health += 100;
+						if(actors[0].health > actors[0].maxhealth){
+							actors[0].health = actors[0].maxhealth;
+						}
+						break;
+					case 1:
+						
+						break;
+					case 2:
+						score += 5;
+						break;
+					case 3:
+						score += 10;
+						break;
+					case 4:
+						score += 20;
+						break;
+				}
+				this.deleteme = true;
 			}
 		}
 	}
@@ -704,6 +722,9 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 					actors[j].xvel += this.xvel / 8;
 					actors[j].yvel += this.yvel / 8;
 					actors[j].tookDamage = 40;
+					if(actors[j].health <= 0 && j > 0){
+						score += [0, 0, 0, 0, 0, 0, 20][actors[j].image];
+					}
 					this.deleteme = true;
 				}
 			}
@@ -985,8 +1006,14 @@ function loopGame(){
 				}
 				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
 			}else if(lv[i][j] == 'E'){
-				actors[actors.length] = new Actor(6, 'all', 100, 100, 3, j << 4, i << 4, 16, 16);
+				actors[actors.length] = new Actor(6, 'all', 100, 50, 3, j << 4, i << 4, 16, 16);
 				ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+				level[i] = setStrChar(level[i], j, '.');
+			}else if(lv[i][j] == 'H'){
+				items[items.length] = new Item(0, j << 4, i << 4);
+				level[i] = setStrChar(level[i], j, '.');
+			}else if(parseInt(lv[i][j]) > -1){
+				items[items.length] = new Item(parseInt(lv[i][j]) + 2, j << 4, i << 4);
 				level[i] = setStrChar(level[i], j, '.');
 			}
 		}
@@ -1020,6 +1047,10 @@ function loopGame(){
 	}
 	lastspeed = (new Date() % 10 == 0 ? r(1000 / speed) : lastspeed);
 	context.fillText('FPS: ' + lastspeed, 10, 20);
+	if(game == 'playing' && gameMode == 'adventure'){
+		context.fillText('Level: ' + (levelNo + 1), 10, 258);
+		context.fillText('Score: ' + score, 10, 275);
+	}
 	if(game == 'playing'){
 		if(gameMode == 'time'){
 			var time = r((new Date().getTime() - clockStart));
@@ -1039,9 +1070,9 @@ function loopGame(){
 	if(mobile){
 		context.fillText('RetX: ' + r(mouse.x), 420, 290);
 		context.fillText('RetX: ' + r(mouse.y), 490, 290);
-		context.fillText('Sint mobile version α 0.6', 490, 310);
+		context.fillText('Sint mobile version α 0.6.1', 490, 310);
 	}else{
-		context.fillText('Sint version α 0.6', 490, 20); // β
+		context.fillText('Sint version α 0.6.1', 490, 20); // β
 	}
 	context.fillText(test, 490, 290);
 	for(i in ais){
@@ -1128,6 +1159,7 @@ function loopGame(){
 					message = ['Use ' + controls + ' to move', 'Mouse to aim and click to shoot', 'Get past level 20 to win'];
 					game = 'playing';
 					gameMode = 'adventure';
+					levelNo = 0;
 					break;
 				default:
 					ui.area = 0;
