@@ -31,22 +31,26 @@ function setCookie(name, value, days){
 }
 
 function getCookie(name){
-	var value = document.cookie;
-	var start = value.indexOf(" " + name + "=");
-	if (start == -1){
-		start = value.indexOf(name + "=");
-	}
-	if (start == -1){
-		value = null;
-	}else{
-		start = value.indexOf("=", start) + 1;
-		var end = value.indexOf(";", start);
-		if (end == -1){
-			end = value.length;
+	try{
+		var value = document.cookie;
+		var start = value.indexOf(" " + name + "=");
+		if (start == -1){
+			start = value.indexOf(name + "=");
 		}
-		value = unescape(value.substring(start, end));
+		if (start == -1){
+			value = null;
+		}else{
+			start = value.indexOf("=", start) + 1;
+			var end = value.indexOf(";", start);
+			if (end == -1){
+				end = value.length;
+			}
+			value = unescape(value.substring(start, end));
+		}
+		return value;
+	}catch(err){
+		return null;
 	}
-	return value;
 }
 
 // Get mouse position
@@ -82,13 +86,24 @@ function reset(){
 	keysDown = [];
 	test = [];
 	level = ['','','','','','','','','','','','','','','','','','','',''];
+	lvDis = [0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 7, 8];
+	unlockKey = [0, 3, 5, 8, 11, 13, 15, 17, 20];
 	score = 0;
+	record = [false, false, false];
 	partsInserted = [];
-	var tempCook = getCookie('options');
-	if(tempCook){
-		optionvars = tempCook;
+	cookies = false;
+	setCookie('test', 'apple', 1);
+	if(getCookie('test') == 'apple'){
+		cookies = true;
+	}
+	if(cookies && getCookie('options')){
+		try{
+			optionvars = JSON.parse(getCookie('options'));
+		}catch(err){
+			optionvars = [0, 50, 87, 65, 68, 69, 81];
+		}
 	}else{
-		optionvars = [50, 50, 87, 65, 68, 69, 81];
+		optionvars = [0, 50, 87, 65, 68, 69, 81];
 	}
 	game = 'menu';
 	moveLocked = false;
@@ -109,14 +124,22 @@ function reset(){
 	trialComplete = false;
 	finTime = false;
 	sound = {
-		shoot1: new Audio('sfx.wav'),
+		shoot1: new Audio('sfx2.wav'),
 		jump: new Audio('Funk.mp3'),
 	}
+	music = {
+		dash: {
+			sound: new Audio('Dash.wav'),
+			len: 221
+		}
+	}
+	musicPlaying = false;
+	musicPlayingID = false;
+	musicStartTime = Math.floor(new Date().getTime() / 1000);
 	menu = [
 		[
 			['Play', 4, true],
 			['Options', 1, true],
-			//['Level Editor', 10, true],
 			['Credits', 6, true]
 		],
 		[
@@ -200,11 +223,13 @@ function toMenu(){
 
 function play(){
 	// Create player and its key controller
-	actors[0] = new Actor(0, 'player', 200, 200, 3, 128, 64, 16, 16);
-	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next'], [optionvars[6], 'next']]);
+	actors[0] = new Actor(0, 'player', 200, 8, 200, 3, 128, 64, 16, 16);
+	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next', 0], [optionvars[6], 'prev', 0]]);
 	
 	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule
-	//setCookie('options', );
+	if(cookies){
+		setCookie('options', JSON.stringify(optionvars), 30);
+	}
 	finTime = false;
 	
 	camera = [actors[0]]; // Set camera.
@@ -222,7 +247,7 @@ function r(num){
 
 function spawn(no){
 	for(i = 0 ; i < no; i++){
-		actors[actors.length] = new Actor(7, 'all', 100, 100, 3, lookx + 250 + ((Math.random() - 0.5) * 200), 0, 16, 16);
+		actors[actors.length] = new Actor(7, 'all', 1, 6, 50, 3, lookx + 250 + ((Math.random() - 0.5) * 200), 0, 16, 16);
 		ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
 	}
 }
@@ -407,7 +432,7 @@ function Ai(index, ai){
 }
 
 // Actor class for all solid cubes
-function Actor(image, type, health, energy, powers, xpos, ypos, width, height, ai){
+function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width, height, ai){
 	this.image = image;
 	this.ai = typeof ai === 'undefined' ? false : ai;
 	this.group = type;
@@ -415,6 +440,7 @@ function Actor(image, type, health, energy, powers, xpos, ypos, width, height, a
 	this.maxhealth = health;
 	this.energy = energy;
 	this.maxenergy = energy;
+	this.speed = moveSpeed;
 	this.tookDamage = 0;
 	this.select = 0;
 	this.powers = 1;
@@ -469,10 +495,10 @@ function Actor(image, type, health, energy, powers, xpos, ypos, width, height, a
 					}
 					break;
 				case 'moveLeft':
-					this.xvel -= (0.08 * speed);
+					this.xvel -= ((this.speed / 100) * speed);
 					break;
 				case 'moveRight':
-					this.xvel += (0.08 * speed);
+					this.xvel += ((this.speed / 100) * speed);
 					break;
 				case 'jump':
 					this.box.y += 1;
@@ -488,11 +514,15 @@ function Actor(image, type, health, energy, powers, xpos, ypos, width, height, a
 				case 'current':
 					this.action(this.select);
 					break;
-				case 'next':
-					this.select = (this.select + 1) % this.powers;
-					break;
 				case 'prev':
-					this.select = (this.select <= 0 ? this.powers : this.select - 1);
+					if(this.powers > 1){
+						this.select = (this.select + 1) % (this.powers);
+					}else{
+						this.select = 0;
+					}
+					break;
+				case 'next':
+					this.select = (this.select <= 0 ? (this.powers - 1) : this.select - 1);
 					break;
 				case 'suicide':
 					this.health = (this.y > 50 ? 0 : this.health);
@@ -519,12 +549,15 @@ function Actor(image, type, health, energy, powers, xpos, ypos, width, height, a
 		this.health = this.box.health;
 		if(this.health <= 0){
 			if(this.image == 0){
-				messsage = ['', 'Shuffleshit, yo'];
 				for(i = 0; i < 64; i++){
 					particles.push(new Particle(0, 0, 0, Math.random() * 500 + 2500, this.x + ((i % 8) * 2), this.y - ((i % 8) * 2), (Math.random() - 0.5) * 10, (Math.random() - 0.8) * 10, 0.4, [0.99, 0.99]));
 				}
-				this.x = 128;
-				this.y = 64;
+				if(gameMode == 'free'){
+					this.y = -500;
+				}else{
+					this.x = 128;
+					this.y = 64;
+				}
 				this.xvel = 0;
 				this.yvel = 0;
 				this.health = this.maxhealth;
@@ -541,25 +574,17 @@ function Actor(image, type, health, energy, powers, xpos, ypos, width, height, a
 	}
 	
 	this.draw = function(){
-		//var reflect = 100; // Depth reflection goes before fading completely
 		var drawx = r(this.x - lookx + this.xvel);
 		var drawy = 200;
-		context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r(this.y - 16 - looky), this.w, this.h);
+		context.drawImage(spritesheet, (this.image % 8) * 16, Math.floor(this.image / 8) * 16, 16, 16, drawx, r(this.y - 16 - looky), this.w, this.h);
 		context.globalAlpha = 1;
 		if(this.tookDamage > 0 && this.image != 0){
 			context.strokeStyle = '#555';
 			context.fillStyle = '#c54';
-			context.fillRect(r((this.x - lookx) + 8 + this.xvel) - 10 - 0.5, r(this.y) - 23.5, (this.health / this.maxhealth) * 20, 5);
-			context.strokeRect(r((this.x - lookx) + 8 + this.xvel) - 10 - 0.5, r(this.y) - 23.5, 20, 5);
+			context.fillRect(r((this.x - lookx) + 8 + camera[0].xvel) - 10 - 0.5, r(this.y) - 23.5, (this.health / this.maxhealth) * 20, 5);
+			context.strokeRect(r((this.x - lookx) + 8 + camera[0].xvel) - 10 - 0.5, r(this.y) - 23.5, 20, 5);
 			this.tookDamage -= 0.05 * speed;
 		}
-		//context.drawImage(spritesheet, this.image * 16, 16, 16, 16, drawx, r((216 - (this.y - 216)) - looky), 16, 16);
-		// StartX, StartY, EndX, EndY
-		//var gradient = context.createLinearGradient(drawx, r((216 - this.y + 216) - looky - 5), drawx, r((214 - (this.y - 216)) - looky) + 16);
-		//gradient.addColorStop(0.1, 'rgba(255, 255, 255, ' + (this.y < 120 ? 1 : ((200 - this.y) / 35) + 0.2) +')');
-		//gradient.addColorStop(0.9, 'rgba(255, 255, 255, 1)');
-		//context.fillStyle = gradient;
-		//context.fillRect(drawx, r((216 - (this.y - 216)) - looky), 16, 16);
 	}
 }
 
@@ -581,7 +606,6 @@ function Item(type, xpos, ypos){
 		act = actors[0];
 		if(this.y + 16 < act.y + act.h && this.y + 32 > act.y){
 			if(this.x + 16 > act.x && this.x < act.x + act.w){
-				console.log(this.deleteme);
 				switch(this.type){
 					case 0:
 						actors[0].health += 100;
@@ -618,7 +642,8 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 	this.type = type;
 	this.air = airRes;
 	this.life = lifespan;
-	this.size = [3, 5, 7, 5][type];
+	this.sizes = [3, 5, 7, 5];
+	this.size = this.sizes[type];
 	this.created = this.timeup = new Date();
 	this.timeup = new Date(this.timeup.getTime() + lifespan);
 	this.deleteme = false;
@@ -637,7 +662,8 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 		context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, size, size);
 	};
 	
-	this.draw = function(){
+	this.draw = function(extendSize){
+		extendSize = (typeof extendSize === 'undefined' ? 1 : extendSize);
 		if(this.x > lookx - 50 && this.x < lookx + 550 && this.y < 300 && this.y > -50){
 			switch(this.drawType){
 				case 'mouse':
@@ -647,23 +673,47 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 					context.strokeRect(mouse.x - this.vars[0] / 2, mouse.y - this.vars[0] / 2, this.vars[0], this.vars[0]);
 					break;
 				case 0:
-					this.drawBox(1, 1, '#66b', 2);
+					this.drawBox(1, 1 * extendSize, '#66b', 2 * extendSize);
 					break;
 				case 1:
-					this.drawBox(1, 1, '#f87', 2);
+					this.drawBox(1, 1 * extendSize, '#f87', 2 * extendSize);
 					break;
 				case 2:
-					this.drawBox(1, 1, '#655', 2);
+					this.drawBox(1, 1 * extendSize, '#655', 2 * extendSize);
 					break;
 				case 3:
-					context.globalAlpha = 0.5;
-					context.lineWidth = 1;
-					context.strokeStyle = '#000';
-					context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, 4, 4);
+					this.drawBox(0.5, 1 * extendSize, '#000', 4 * extendSize);
+					break;
+				case 4:
+					break;
+				case 5:
+					break;
+				case 6:
+					break;
+				case 7:
 					break;
 			}
 			context.globalAlpha = 1;
 		}
+	}
+	
+	this.drawIcons = function(){
+		for(var k = 0; k < 8; k++){
+			//(480 - (k * 35)) + lookx;
+			// 293;
+			this.x = (480.5 - (35 * k)) + r(lookx);
+			this.y = 293.5;
+			switch(k){
+				case 0:
+					this.x -= 2;
+					this.y -= 2;
+					this.drawBox(1, 1.5, '#66b', 4);
+					break;
+			}
+		}
+		this.drawType = 'mouse';
+		this.x = lookx;
+		this.y = 0;
 	}
 	
 	this.simulate = function(){
@@ -723,7 +773,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 					actors[j].yvel += this.yvel / 8;
 					actors[j].tookDamage = 40;
 					if(actors[j].health <= 0 && j > 0){
-						score += [0, 0, 0, 0, 0, 0, 20][actors[j].image];
+						score += [20, 50, 0, 0, 0, 0, 0, 0][actors[j].image - 8];
 					}
 					this.deleteme = true;
 				}
@@ -761,6 +811,8 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 	this.air = (typeof airRes === 'undefined' ? [0.99, 1] : airRes);
 	this.health = 0;
 	this.inlava = false;
+	this.setX = false;
+	this.setY = false;
 	
 	this.reset = function(){
 		this.right = false;
@@ -779,21 +831,23 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 		var collision = false;
 		var type = 'level';
 		this.inlava = false;
+		this.setX = false;
+		this.setY = false;
 		test = [];
 		for(var hr = 0; hr < colareax; hr++){
 			for(var vr = 0; vr < colareay; vr++){
-				var xcol = (((this.x - (hr == colareax - 1 ? 1 + 16 - (((this.width - 1) % 16) + 1): 0)) >> 4) + hr);
-				var ycol = (((this.y - (vr == colareay - 1 ? 1 + 16 - (((this.height - 1) % 16) + 1) : 0)) >> 4) + vr);
-				if(ycol - 1 >= 0 && ycol <= lv.length){
-					if(xcol >= 0 && xcol < lv[ycol].length){
-						if(lv[ycol - 1][xcol] == '#'){
+				var xcol = (((this.x - (hr == colareax - 1 ? 1 + 16 - (((this.width - 1) % 16) + 1): 0)) >> 4) + hr); // This is a bit complicated...
+				var ycol = (((this.y - (vr == colareay - 1 ? 1 + 16 - (((this.height - 1) % 16) + 1) : 0)) >> 4) + vr); // It will get the number of 16x16...
+				if(ycol - 1 >= 0 && ycol <= lv.length){ // Blocks it takes to cover the entire actor or particle. E.g. something 8x8 needs 2 xcol and 2 ycol,
+					if(xcol >= 0 && xcol < lv[ycol].length){ // This is because it could be on the border between 2 blocks, covering up to 4 of them.
+						if(lv[ycol - 1][xcol] == '#'){ // If normal block
 							collision = true;
-						}else if(lv[ycol - 1][xcol] == 'x'){
+						}else if(lv[ycol - 1][xcol] == 'x'){ // If in lava
 							this.health -= 0.01 * speed;
 							this.inlava = true;
-							this.xvel *= Math.pow(0.997, speed);
+							this.xvel *= Math.pow(0.997, speed); // Slow down velocity
 							this.yvel *= Math.pow(0.997, speed);
-						}else if(lv[ycol - 1][xcol] == 'w'){
+						}else if(lv[ycol - 1][xcol] == 'w'){ // If in water
 							this.inlava = true;
 							this.xvel *= Math.pow(0.999, speed);
 							this.yvel *= Math.pow(0.999, speed);
@@ -802,12 +856,16 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 								var time = r((new Date().getTime() - clockStart));
 								finTime = toClock(time, 3);
 								rawFinTime = time;
-								var record = getCookie('trial record: ' + levelNo);
-								if(rawFinTime < record || !record){
-									setCookie('trial record: ' + levelNo, rawFinTime, 30);
-									record = rawFinTime;
+								if(cookies){
+									record[levelNo] = getCookie('trial record: ' + levelNo);
 								}
-								message = ['Level completed', 'Time : ' + finTime, 'Record : ' + toClock(record, 3)];
+								if(rawFinTime < record[levelNo] || record[levelNo] == false){
+									if(cookies){
+										setCookie('trial record: ' + levelNo, rawFinTime, 30);
+									}
+									record[levelNo] = rawFinTime;
+								}
+								message = ['Level completed', 'Time : ' + finTime, 'Record : ' + toClock(record[levelNo], 3)]; // When finished time trial
 							}
 							trialComplete = true;
 						}
@@ -816,12 +874,22 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 			}
 		}
 		if(this.col == 0){
-			for(j in actors){
+			for(j in actors){ // Check if colliding with another actor
 				var obj = actors[j];
 				if(this.y < obj.y + obj.h && this.y + obj.h > obj.y && this.x + obj.w > obj.x && this.x < obj.x + obj.w && obj.box != this){
 					collision = true;
+					var inv = this.xvel > 0;
+					if(this.y < obj.y - this.height - 1 || this.y > obj.y + obj.h + 1){
+						this.setY = obj.y + (inv ? -this.height : obj.h);
+					}else{
+						this.setX = (obj.x + (inv ? -this.width : obj.w) + obj.xvel);
+					}
 				}
 			}
+		}
+		
+		if(this.x <= 16 || this.x > level[0].length << 4){ // If at the edge of the level, collide.
+			collision = true;
 		}
 		
 		return collision;
@@ -831,7 +899,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 		if(!this.inlava){
 			this.down = false;
 		}
-		var apparentVel = (this.xvel * speed) / (1000 / 60);
+		var apparentVel = (this.xvel * speed) / (1000 / 60); // Velocity adapted to frame rate
 		var velToKill = Math.abs(apparentVel)
 		var maxMove = Math.floor(this.width / 2);
 		while(velToKill > 0){ // If velocity is more than half the box size, only move in increments of half box size to prevent clipping
@@ -843,7 +911,11 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 				velToKill = 0;
 			}
 			if(this.collide() && Math.abs(this.xvel) > 0){
-				this.x = ((this.x >> 4) << 4) + (this.xvel > 0 ? 16 - (((this.width - 1) % 16) + 1) : 16);
+				if(this.setX){
+					this.x = this.setX;
+				}else{
+					this.x = ((this.x >> 4) << 4) + (this.xvel > 0 ? 16 - (((this.width - 1) % 16) + 1) : 16);
+				}
 				this.xvel = 0;
 				velToKill = 0;
 			}
@@ -859,10 +931,13 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 			}else{
 				this.y += (this.yvel > 0 ? velToKill : velToKill * -1);
 				velToKill = 0;
-				
 			}
 			if(this.collide()){
-				this.y = ((this.y >> 4) << 4) + (this.yvel > 0 ? 16 - (((this.height - 1) % 16) + 1) : 16);
+				if(this.setY){
+					this.y = this.setY
+				}else{
+					this.y = ((this.y >> 4) << 4) + (this.yvel > 0 ? 16 - (((this.height - 1) % 16) + 1) : 16);
+				}
 				if(this.yvel < 0){
 					this.down = true;
 				}
@@ -907,6 +982,46 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 }
 
 // Run game.
+
+function drawLevel(lv){ // Draw level
+	for(i = 0; i < lv.length; i++){
+		for(j = (lookx > 300 ? r((lookx - 300) / 16) : 0); j < r((lookx + 600) / 16); j++){
+			if(lv[i][j] == '#' || lv[i][j] == 'x' || lv[i][j] == 'w'){
+				var edgeTile = false;
+				if((j < lv[i].length && j > 0 && i < lv.length - 1 && i > 0)){
+					var edgeChecks = [[-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0]];
+					for(k in edgeChecks){
+						if(lv[i + edgeChecks[k][0]][j + edgeChecks[k][1]] != '#'){
+							edgeTile = true;
+						}
+					}
+					if(edgeTile){
+						context.fillStyle = '#ddd';
+					}else{
+						context.fillStyle = '#eee';
+					}
+				}
+				if(lv[i][j] == 'x'){
+					context.fillStyle = '#d77';
+				}
+				if(lv[i][j] == 'w'){
+					context.fillStyle = '#47d';
+				}
+				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
+			}else if(lv[i][j] == 'E'){
+				actors[actors.length] = new Actor(Math.floor(Math.random() * lvDis[levelNo]) + 8, 'all', 100, 6, 50, 3, j << 4, i << 4, 16, 16);
+				ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+				level[i] = setStrChar(level[i], j, '.');
+			}else if(lv[i][j] == 'H'){
+				items[items.length] = new Item(0, j << 4, i << 4);
+				level[i] = setStrChar(level[i], j, '.');
+			}else if(parseInt(lv[i][j]) > -1){
+				items[items.length] = new Item(parseInt(lv[i][j]) + 2, j << 4, i << 4);
+				level[i] = setStrChar(level[i], j, '.');
+			}
+		}
+	}
+}
 
 var speed;
 var lastLoop = new Date();
@@ -979,45 +1094,10 @@ function loopGame(){
 	
 	context.globalAlpha = 1;
 	context.lineWidth = 1;
+	
 	var lv = level;
-	for(i = 0; i < lv.length; i++){ // Draw level
-		for(j = (lookx > 300 ? r((lookx - 300) / 16) : 0); j < r((lookx + 600) / 16); j++){
-			if(lv[i][j] == '#' || lv[i][j] == 'x' || lv[i][j] == 'w'){
-				//#efefef
-				var edgeTile = false;
-				if((j < lv[i].length && j > 0 && i < lv.length - 1 && i > 0)){
-					var edgeChecks = [[-1, 1], [0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0]];
-					for(k in edgeChecks){
-						if(lv[i + edgeChecks[k][0]][j + edgeChecks[k][1]] != '#'){
-							edgeTile = true;
-						}
-					}
-					if(edgeTile){
-						context.fillStyle = '#ddd';
-					}else{
-						context.fillStyle = '#eee';
-					}
-				}
-				if(lv[i][j] == 'x'){
-					context.fillStyle = '#d77';
-				}
-				if(lv[i][j] == 'w'){
-					context.fillStyle = '#47d';
-				}
-				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
-			}else if(lv[i][j] == 'E'){
-				actors[actors.length] = new Actor(6, 'all', 100, 50, 3, j << 4, i << 4, 16, 16);
-				ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
-				level[i] = setStrChar(level[i], j, '.');
-			}else if(lv[i][j] == 'H'){
-				items[items.length] = new Item(0, j << 4, i << 4);
-				level[i] = setStrChar(level[i], j, '.');
-			}else if(parseInt(lv[i][j]) > -1){
-				items[items.length] = new Item(parseInt(lv[i][j]) + 2, j << 4, i << 4);
-				level[i] = setStrChar(level[i], j, '.');
-			}
-		}
-	}
+	drawLevel(lv);
+	
 	context.fillStyle = 'rgba(255, 200, 200, 0.7)';
 	for(i in test){
 		context.fillRect((test[i][0] << 4) - lookx, test[i][1] << 4, 16, 16);
@@ -1034,11 +1114,18 @@ function loopGame(){
 	if(game == 'playing'){
 		context.strokeStyle = '#555';
 		context.fillStyle = '#c54';
-		context.fillRect(10, 285, camera[0].health / 2, 10);
-		context.strokeRect(10, 285, camera[0].maxhealth / 2, 10);
+		context.fillRect(10.5, 285.5, camera[0].health / 2, 10);
+		context.strokeRect(10.5, 285.5, camera[0].maxhealth / 2, 10);
 		context.fillStyle = '#68f';
-		context.fillRect(10, 300, camera[0].energy / 2, 10);
-		context.strokeRect(10, 300, camera[0].maxenergy / 2, 10);
+		context.fillRect(10.5, 300.5, camera[0].energy / 2, 10);
+		context.strokeRect(10.5, 300.5, camera[0].maxenergy / 2, 10);
+		for(var l = 0; l < 8; l++){
+			context.strokeStyle = (l == actors[0].select ? '#555' : (actors[0].powers > l ? 'rgba(50, 50, 50, 0.5)' : 'rgba(50, 50, 50, 0.2)'));
+			context.fillStyle = (l == actors[0].select ? 'rgba(180, 180, 210, 0.5)' : (actors[0].powers > l ? 'rgba(200, 200, 200, 0.2)' : 'rgba(200, 200, 200, 0.1)'));
+			context.fillRect(465.5 - (l * 35), 278.5, 30, 30);
+			context.strokeRect(465.5 - (l * 35), 278.5, 30,30);
+		}
+		particles[0].drawIcons();
 		context.fillStyle = '#444';
 	}else{
 		context.fillText('W and S to move', 10, 270);
@@ -1070,9 +1157,13 @@ function loopGame(){
 	if(mobile){
 		context.fillText('RetX: ' + r(mouse.x), 420, 290);
 		context.fillText('RetX: ' + r(mouse.y), 490, 290);
-		context.fillText('Sint mobile version α 0.6.1', 490, 310);
+		context.fillText('Sint mobile version α 0.6.2', 490, 310);
 	}else{
-		context.fillText('Sint version α 0.6.1', 490, 20); // β
+		context.fillText('Sint version α 0.6.2', 490, 20); // β
+		if(cookies && game == 'menu'){
+			context.fillText('Sint uses cookies to remember', 490, 290);
+			context.fillText('options and time trial records', 490, 310);
+		}
 	}
 	context.fillText(test, 490, 290);
 	for(i in ais){
@@ -1261,6 +1352,9 @@ function loopGame(){
 			}else{
 				ui.area = menu[ui.area][ui.select][1];
 				ui.select = 0;
+				if(cookies){
+					setCookie('options', JSON.stringify(optionvars));
+				}
 			}
 		}
 	}
@@ -1300,4 +1394,35 @@ function loopGame(){
 		toMenu();
 	}
 	keysDown = [];
+	
+	 // Play music
+	 
+	if(game == 'menu'){
+		musicToPlay = false;
+		musicToPlayID = false;
+	}else{
+		musicToPlay = music.dash;
+		musicToPlayID = 'Dash';
+	}
+	
+	if(musicPlayingID != musicToPlayID){
+		if(musicPlaying){
+			musicPlaying.sound.pause();
+			musicPlaying.sound.currentTime = 0;
+		}
+		musicStartTime = Math.floor(new Date().getTime() / 1000);
+		musicPlaying = musicToPlay;
+		musicPlayingID = musicToPlayID;
+		if(musicPlaying){
+			musicPlaying.sound.play();
+		}
+	}
+	
+	if(new Date().getTime() / 1000 > musicStartTime + musicPlaying.len && musicToPlay){
+		musicPlaying.sound.play();
+	}
+	
+	if(musicPlaying){
+		musicPlaying.sound.volume = optionvars[0] / 100;
+	}
 }
