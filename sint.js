@@ -125,7 +125,9 @@ function reset(){
 	finTime = false;
 	sound = {
 		shoot1: new Audio('sfx2.wav'),
-		jump: new Audio('Funk.mp3'),
+		point: new Audio('point.wav'),
+		explode: new Audio('explode.wav'),
+		jump: new Audio('Funk.mp3')
 	}
 	music = {
 		dash: {
@@ -223,7 +225,7 @@ function toMenu(){
 
 function play(){
 	// Create player and its key controller
-	actors[0] = new Actor(0, 'player', 200, 8, 200, 3, 128, 64, 16, 16);
+	actors[0] = new Actor(0, 0, 200, 8, 200, 3, 128, 64, 16, 16);
 	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next', 0], [optionvars[6], 'prev', 0]]);
 	
 	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule
@@ -240,6 +242,21 @@ function animate() {
 	loopGame();
 }
 
+function control(n){
+	if(actors[n]){
+		camera = [actors[n]];
+		for(var i in ais){
+			if(ais[i].actor == actors[n]){
+				ais.splice(i, 1);
+			}
+			controllers[0] = new Controller(actors[n], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next', 0], [optionvars[6], 'prev', 0]]);
+		}
+		
+	}else{
+		return false;
+	}
+}
+
 // Rounds a number.
 function r(num){
 	return Math.round(num);
@@ -247,7 +264,7 @@ function r(num){
 
 function spawn(no){
 	for(i = 0 ; i < no; i++){
-		actors[actors.length] = new Actor(7, 'all', 1, 6, 50, 3, lookx + 250 + ((Math.random() - 0.5) * 200), 0, 16, 16);
+		actors[actors.length] = new Actor(7, 1, 1, 6, 50, 3, lookx + 250 + ((Math.random() - 0.5) * 200), 0, 16, 16);
 		ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
 	}
 }
@@ -352,9 +369,14 @@ function Controller(object, actions){
 					this.actor.action(actions[i][1]);
 				}
 			}
-			if(mouse.down && actions[i][0] == 'c'){
-				this.actor.action(actions[i][1]);
+			if(mouse.down && actions[i][0] == 'c' && singleActionUsed == false){
+				if(this.actor.action(actions[i][1])){
+					singleActionUsed = true;
+				}
 			}
+		}
+		if(!mouse.down){
+			singleActionUsed = false;
 		}
 		this.actor.refreshActions();
 	}
@@ -443,7 +465,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 	this.speed = moveSpeed;
 	this.tookDamage = 0;
 	this.select = 0;
-	this.powers = 1;
+	this.powers = 3;
 	this.yvel = 0;
 	this.xvel = 0;
 	this.imageLoad = 2;
@@ -476,12 +498,32 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 			switch(type){
 				case 0:
 					if(this.energy >= 2){
-						particles.push(new Particle(0, 0, 0, Math.random() * 500 + 5000, this.x + 8, this.y - 8, Math.cos(angle) * 15 + this.xvel, Math.sin(angle) * 15 + this.yvel, 0.4, [0.997, 0.997]));
+						particles.push(new Particle(0, this.type, 0, Math.random() * 500 + 5000, this.x + 8, this.y - 8, Math.cos(angle) * 15 + this.xvel, Math.sin(angle) * 15 + this.yvel, 0.4, [0.997, 0.997]));
 						if(distanceToSound < 500){
 							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
 							sound.shoot1.play();
 						}
 						this.energy -= 2;
+					}
+					break;
+				case 1:
+					if(this.energy >= 3){
+						particles.push(new Particle(1, this.type, 4, Math.random() * 500 + 4500, this.x + 8, this.y - 8, Math.cos(angle + ((Math.random() - 0.5) * 0.03)) * 8, Math.sin(angle + ((Math.random() - 0.5) * 0.03)) * 8, 0, [0.999, 0.999]));
+						if(distanceToSound < 500){
+							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+							sound.shoot1.play();
+						}
+						this.energy -= 3;
+					}
+					break;
+				case 2:
+					if(this.energy >= 100){
+						particles.push(new Particle(2, 2, 5, 200000, this.x + 8, this.y - 8, Math.cos(angle + ((Math.random() - 0.5) * 0.03)) * 12, Math.sin(angle + ((Math.random() - 0.5) * 0.03)) * 12, 0.5, [0.9975, 0.9975], false));
+						if(distanceToSound < 500){
+							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+							sound.shoot1.play();
+						}
+						this.energy -= 100;
 					}
 					break;
 				case 'en1':
@@ -513,6 +555,9 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 					break;
 				case 'current':
 					this.action(this.select);
+					if(this.select == 2){
+						return true;
+					}
 					break;
 				case 'prev':
 					if(this.powers > 1){
@@ -531,6 +576,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 					tomenu = true;
 					break;
 			}
+			return false;
 		}
 		this.actionsturn.push(type);
 	}
@@ -618,12 +664,18 @@ function Item(type, xpos, ypos){
 						break;
 					case 2:
 						score += 5;
+						sound.point.volume = optionvars[1] / 150;
+						sound.point.play();
 						break;
 					case 3:
 						score += 10;
+						sound.point.volume = optionvars[1] / 150;
+						sound.point.play();
 						break;
 					case 4:
 						score += 20;
+						sound.point.volume = optionvars[1] / 150;
+						sound.point.play();
 						break;
 				}
 				this.deleteme = true;
@@ -632,11 +684,12 @@ function Item(type, xpos, ypos){
 	}
 }
 
-function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel, gravity, airRes){
+function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel, gravity, airRes, actDeath){
 	this.gravity = typeof gravty !== 'undefined' ? gravity : 1;
 	this.x = xpos;
 	this.y = ypos;
 	this.drawType = drawType;
+	this.actDeath = typeof actDeath === 'undefined' ? true : actDeath;
 	this.xvel = xvel;
 	this.yvel = yvel;
 	this.type = type;
@@ -655,11 +708,21 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 	this.box = new Box(this.x, this.y, this.size, this.size, this.xvel, this.yvel, 1, gravity, this.air);
 	this.box.unstuck();
 	
-	this.drawBox = function(alpha, width, color, size){
+	this.drawBox = function(alpha, width, color, size, fill, rel){
 		context.globalAlpha = alpha;
 		context.lineWidth = width;
+		context.beginPath();
 		context.strokeStyle = color;
-		context.strokeRect(r(this.x - lookx) + 0.5, r(this.y - looky) + 0.5, size, size);
+		var add = (width % 2 == 0 ? 0 : 0.5);
+		var rel = (typeof rel === 'undefined' ? 1 : rel);
+		context.rect(r(this.x - (lookx * rel)) + add, r(this.y) + add, size, size);
+		if(typeof fill !== 'undefined'){
+			if(fill != false){
+				context.fillStyle = fill;
+				context.fill();
+			}
+		}
+		context.stroke();
 	};
 	
 	this.draw = function(extendSize){
@@ -685,10 +748,13 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 					this.drawBox(0.5, 1 * extendSize, '#000', 4 * extendSize);
 					break;
 				case 4:
+					this.drawBox(0.8, 1 * extendSize, '#229', 3 * extendSize);
 					break;
 				case 5:
+					this.drawBox(1, 2 * extendSize, '#93b', 5 * extendSize, '#b7f');
 					break;
 				case 6:
+					this.drawBox(1, 1 * extendSize, '#93b', 2 * extendSize);
 					break;
 				case 7:
 					break;
@@ -701,14 +767,23 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 		for(var k = 0; k < 8; k++){
 			//(480 - (k * 35)) + lookx;
 			// 293;
-			this.x = (480.5 - (35 * k)) + r(lookx);
+			this.x = 480.5 - (35 * k);
 			this.y = 293.5;
 			switch(k){
 				case 0:
 					this.x -= 2;
 					this.y -= 2;
-					this.drawBox(1, 1.5, '#66b', 4);
+					this.drawBox(1, 1.5, '#66b', 4, false, 0);
 					break;
+				case 1:
+					this.x -= 3;
+					this.y -= 3;
+					this.drawBox(0.8, 2, '#229', 6, false, 0);
+					break;
+				case 2:
+					this.x -= 5;
+					this.y -= 5;
+					this.drawBox(1, 3, '#93b', 10, '#b7f', 0);
 			}
 		}
 		this.drawType = 'mouse';
@@ -717,6 +792,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 	}
 	
 	this.simulate = function(){
+		var distanceToSound = Math.abs(this.x - lookx - 250);
 		switch(this.type){
 			case 'mouse':
 				if(this.vars[0] == false){
@@ -749,17 +825,21 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 				}
 				break;
 			case 0:
-				/*
-				for(j in actors){
-					if(Math.abs(this.x - (actors[j].x + 8)) < 20 && Math.abs(this.y - (actors[j].y + 8)) < 20){
-						this.xvel += (20 - Math.abs(this.x - (actors[j].x + 8))) / (this.x > (actors[j].x + 8) ? 5 : -5);
-						this.yvel += (20 - Math.abs(this.y - (actors[j].y + 8))) / (this.y > (actors[j].y + 8) ? 5 : -5);
-					}
-				}
-				*/
 				break;
 			case 1:
-			
+				break;
+			case 2:
+				if(this.yvel == 0){
+					this.deleteme = true;
+					for(var i = 0; i < 100; i++){
+						particles[particles.length] = new Particle(3, 2, 6, Math.random() * 500 + 2000, this.x, this.y, (Math.random() - 0.5) * 18, (Math.random() - 0.9) * 9, 0.4, [0.998, 0.998])
+					}
+					sound.explode.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 400;
+					sound.explode.play();
+				}
+				break;
+			case 3:
+				break;
 			default:
 				break;
 		}
@@ -768,7 +848,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 			var act = actors[j];
 			if(this.y + 16 < act.y + act.h && this.y + 16 + this.size > act.y){
 				if(this.x + this.size > act.x && this.x < act.x + act.w && (this.aff == 1 ? j == 0 : j > 0)){
-					actors[j].health -= (Math.abs(this.xvel) + Math.abs(this.yvel)) / 10;
+					actors[j].health -= (Math.abs(this.xvel) + Math.abs(this.yvel)) / [10, 3, 0.2, 2][this.type];
 					actors[j].xvel += this.xvel / 8;
 					actors[j].yvel += this.yvel / 8;
 					actors[j].tookDamage = 40;
@@ -845,6 +925,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 						}else if(lv[ycol - 1][xcol] == 'x'){ // If in lava
 							this.health -= 0.01 * speed;
 							this.inlava = true;
+							
 							this.xvel *= Math.pow(0.997, speed); // Slow down velocity
 							this.yvel *= Math.pow(0.997, speed);
 						}else if(lv[ycol - 1][xcol] == 'w'){ // If in water
@@ -1009,7 +1090,7 @@ function drawLevel(lv){ // Draw level
 				}
 				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
 			}else if(lv[i][j] == 'E'){
-				actors[actors.length] = new Actor(Math.floor(Math.random() * lvDis[levelNo]) + 8, 'all', 100, 6, 50, 3, j << 4, i << 4, 16, 16);
+				actors[actors.length] = new Actor(Math.floor(Math.random() * lvDis[levelNo]) + 8, 1, 100, 6, 50, 3, j << 4, i << 4, 16, 16);
 				ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
 				level[i] = setStrChar(level[i], j, '.');
 			}else if(lv[i][j] == 'H'){
@@ -1049,13 +1130,14 @@ function loopGame(){
 				partFound = false;
 				if(partsInserted.length == 0){
 					var toInsert = levelparts[0];
-					partsInserted.push([false, '5n', 1, 1, 0]);
+					partsInserted.push([false, '5n', 1, 1, 0, 0]);
 					partFound = true;
 				}else{
 					thisPart = levelparts[partIndex];
-					if(thisPart[20] == partsInserted[partsInserted.length - 1][1] && (Math.random() * thisPart[24]) < 1){
+					var prevPart = partsInserted[partsInserted.length - 1];
+					if(thisPart[20] == prevPart[1] && (Math.random() * thisPart[24]) < 1 && (prevPart[5] != partIndex || Math.random() <= 0.3)){
 						if(partsInserted[partsInserted.length - 1] != thisPart || Math.random() < 0){
-							partsInserted.push([thisPart[20], thisPart[21], thisPart[22], thisPart[23], thisPart[24]]);
+							partsInserted.push([thisPart[20], thisPart[21], thisPart[22], thisPart[23], thisPart[24], partIndex]);
 							toInsert = thisPart;
 							partFound = true;
 						}
@@ -1157,9 +1239,9 @@ function loopGame(){
 	if(mobile){
 		context.fillText('RetX: ' + r(mouse.x), 420, 290);
 		context.fillText('RetX: ' + r(mouse.y), 490, 290);
-		context.fillText('Sint mobile version α 0.6.2', 490, 310);
+		context.fillText('Sint mobile version α 0.6.3', 490, 310);
 	}else{
-		context.fillText('Sint version α 0.6.2', 490, 20); // β
+		context.fillText('Sint version α 0.6.3', 490, 20); // β
 		if(cookies && game == 'menu'){
 			context.fillText('Sint uses cookies to remember', 490, 290);
 			context.fillText('options and time trial records', 490, 310);
