@@ -87,6 +87,13 @@ function reset(){
 	test = [];
 	level = ['','','','','','','','','','','','','','','','','','','',''];
 	lvDis = [0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 7, 8];
+	upgrades = {
+		health: [300, 500, 800, 1200, 1700, 2300, 3000],
+		energy: [200, 350, 600, 1000, 1500, 2000, 2600],
+		powers: [400, 800, 1500, 2500, 4000, 6500, 10000],
+		healthOn: 0,
+		energyOn: 0
+	}
 	unlockKey = [0, 3, 5, 8, 11, 13, 15, 17, 20];
 	score = 0;
 	record = [false, false, false];
@@ -167,7 +174,7 @@ function reset(){
 			['Back', 0, true]
 		],
 		['r', 'play'],
-		['t', 'Sint', '', 'Programming and graphics by Markus Scully (Asraelite)', 'Sound and music by Christian Stryczynski'],
+		['t', 'Sint', '', 'Programming and graphics by Markus Scully (Asraelite)', 'Sound and music by Christian Stryczynski and Asraelite'],
 		[
 			['"Super Awesome Carrot" by Josh', 8, 0, 'tl'],
 			['"Duck" by Asraelite', 8, 1, 'tl'],
@@ -178,6 +185,8 @@ function reset(){
 		['r', 'adventure']
 	];
 	lastspeed = 0;
+	limitLeft = 16;
+	limitRight = 1000000;
 	
 	if(/Android|webOS|iPhone|iPad|iPod|BlackBerry/i.test(navigator.userAgent)){ // Check if mobile
 		mobile = true;
@@ -226,7 +235,9 @@ function toMenu(){
 
 function play(){
 	// Create player and its key controller
-	actors[0] = new Actor(0, 0, 200, 8, 200, 3, 128, 64, 16, 16);
+	limitLeft = 16;
+	limitRight = 1000000000;
+	actors[0] = new Actor(0, 0, 200, 8, 200, 3, limitLeft + 112, 64, 16, 16);
 	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next', 0], [optionvars[6], 'prev', 0]]);
 	
 	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule
@@ -237,8 +248,6 @@ function play(){
 	
 	endAdded = false;
 	
-	limitLeft = 16;
-	limitRight = 1000000000;
 	camera = [actors[0]]; // Set camera.
 }
 
@@ -247,18 +256,16 @@ function newLevel(){
 	endAdded = false;
 	level = ['','','','','','','','','','','','','','','','','','','',''];
 	partsInserted = [];
-	actors = [];
-	controllers = [];
-	particles = [];
+	ais = [];
 	items = [];
-	
-	actors[0] = new Actor(0, 0, 200, 8, 200, 3, 128, 64, 16, 16);
-	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next', 0], [optionvars[6], 'prev', 0]]);
-	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule
-	
+	actors.splice(1, actors.length - 1);
+	particles.splice(1, actors.length - 1);
 	limitLeft = 16;
 	limitRight = 1000000000;
-	camera = [actors[0]];
+	actors[0].x = limitLeft + 112;
+	actors[0].y = 64;
+	actors[0].health = actors[0].maxhealth;
+	actors[0].energy = actors[0].maxenergy;
 }
 
 function animate() {
@@ -499,7 +506,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 	this.speed = moveSpeed;
 	this.tookDamage = 0;
 	this.select = 0;
-	this.powers = 3;
+	this.powers = 1;
 	this.yvel = 0;
 	this.xvel = 0;
 	this.imageLoad = 2;
@@ -645,7 +652,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 				if(gameMode == 'free'){
 					this.y = -500;
 				}else{
-					this.x = 128;
+					this.x = limitLeft + 112;
 					this.y = 64;
 				}
 				this.xvel = 0;
@@ -973,7 +980,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 							this.inlava = true;
 							this.xvel *= Math.pow(0.999, speed);
 							this.yvel *= Math.pow(0.999, speed);
-						}else if(lv[ycol - 1][xcol] == 'F'){
+						}else if(lv[ycol - 1][xcol] == 'F' && actors[0].box == this){
 							if(gameMode == 'time'){
 								if(trialComplete == false){
 									var time = r((new Date().getTime() - clockStart));
@@ -1190,7 +1197,7 @@ function loopGame(){
 					partFound = true;
 					actors.splice(1, actors.length - 1);
 					ais = [];
-					limitRight = 20000 + (5000 * levelNo) + toInsert[0].length + 361;
+					limitRight = ((level[0].length << 4) + ((toInsert[0].length) << 4)) - 500;
 					endAdded = 1;
 				}else{
 					thisPart = levelparts[partIndex];
@@ -1256,11 +1263,11 @@ function loopGame(){
 	if(game == 'playing'){
 		context.strokeStyle = '#555';
 		context.fillStyle = '#c54';
-		context.fillRect(10.5, 285.5, camera[0].health / 2, 10);
-		context.strokeRect(10.5, 285.5, camera[0].maxhealth / 2, 10);
+		context.fillRect(10.5, 285.5, camera[0].health / 5, 10);
+		context.strokeRect(10.5, 285.5, camera[0].maxhealth / 5, 10);
 		context.fillStyle = '#68f';
-		context.fillRect(10.5, 300.5, camera[0].energy / 2, 10);
-		context.strokeRect(10.5, 300.5, camera[0].maxenergy / 2, 10);
+		context.fillRect(10.5, 300.5, camera[0].energy / 5, 10);
+		context.strokeRect(10.5, 300.5, camera[0].maxenergy / 5, 10);
 		for(var l = 0; l < 8; l++){
 			context.strokeStyle = (l == actors[0].select ? '#555' : (actors[0].powers > l ? 'rgba(50, 50, 50, 0.5)' : 'rgba(50, 50, 50, 0.2)'));
 			context.fillStyle = (l == actors[0].select ? 'rgba(180, 180, 210, 0.5)' : (actors[0].powers > l ? 'rgba(200, 200, 200, 0.2)' : 'rgba(200, 200, 200, 0.1)'));
@@ -1278,7 +1285,7 @@ function loopGame(){
 	context.fillText('FPS: ' + lastspeed, 10, 20);
 	if(game == 'playing' && gameMode == 'adventure'){
 		context.fillText('Level: ' + (levelNo + 1), 10, 258);
-		context.fillText('Score: ' + score, 10, 275);
+		context.fillText('Points: ' + score, 10, 275);
 	}
 	if(game == 'playing'){
 		if(gameMode == 'time'){
@@ -1299,9 +1306,9 @@ function loopGame(){
 	if(mobile){
 		context.fillText('RetX: ' + r(mouse.x), 420, 290);
 		context.fillText('RetX: ' + r(mouse.y), 490, 290);
-		context.fillText('Sint mobile version α 0.7', 490, 310);
+		context.fillText('Sint mobile version α 0.7.1', 490, 310);
 	}else{
-		context.fillText('Sint version α 0.7', 490, 20); // β
+		context.fillText('Sint version α 0.7.1', 490, 20); // β
 		if(cookies && game == 'menu'){
 			context.fillText('Sint uses cookies to remember', 490, 290);
 			context.fillText('options and time trial records', 490, 310);
@@ -1328,20 +1335,74 @@ function loopGame(){
 	
 	if(message){
 		if(message == 'win'){
+			// Message box
 			context.strokeStyle = '#555';
 			context.fillStyle = '#ccc';
-			context.fillRect(100, 75, 300, 170);
-			context.strokeRect(100, 75, 300, 170);
+			context.fillRect(100, 50, 300, 220);
+			context.strokeRect(100, 50, 300, 220);
+			// Text properties
 			context.textAlign = 'center';
-			context.fillStyle = '#9bf';
-			context.fillRect(150, 205, 200, 25);
 			context.font = '12pt Helvetica';
+			// Buttons
+			context.fillStyle = (ui.select == 3 ? '#9bf' : '#cdf');
+			context.fillRect(150, 235, 200, 25); // Continue
+			context.fillStyle = (ui.select == 0 ? '#9bf' : '#cdf');
+			context.fillRect(110, 135, 280, 25); // Health
+			context.fillStyle = (ui.select == 1 ? '#9bf' : '#cdf');
+			context.fillRect(110, 165, 280, 25); // Energy
+			context.fillStyle = (ui.select == 2 ? '#9bf' : '#cdf');
+			context.fillRect(110, 195, 280, 25); // Powers
+			// Text
 			context.fillStyle = '#fff';
-			context.fillText('Continue', 250, 223);
-			context.fillText('You have won level ' + (levelNo + 1) + '.', 250, 110);
+			context.fillText('You have won level ' + (levelNo + 1) + '.', 250, 80);
+			context.fillText((19 - levelNo) + ' levels left.', 250, 100);
+			context.fillText('Points: ' + score, 250, 125);
+			context.fillStyle = (ui.select == 3 ? 'fff' : '#eef');
+			context.fillText('Continue', 250, 253);
+			context.fillStyle = (score < upgrades.health[upgrades.healthOn] ? (ui.select == 0 ? '#f98' : '#fcd') : (ui.select == 2 ? '#fff' : '#eef'));
+			context.fillText('Upgrade health +100: ' + upgrades.health[upgrades.healthOn], 250, 153);
+			context.fillStyle = (score < upgrades.energy[upgrades.energyOn] ? (ui.select == 1 ? '#f98' : '#fcd') : (ui.select == 2 ? '#fff' : '#eef'));
+			context.fillText('Upgrade max energy +100: ' + upgrades.energy[upgrades.energyOn], 250, 183);
+			context.fillStyle = (score < upgrades.powers[actors[0].powers - 1] && actors[0].powers < 8 ? (ui.select == 2 ? '#f98' : '#fcd') : (ui.select == 2 ? '#fff' : '#eef'));
+			context.fillText('Unlock next power: ' + upgrades.powers[actors[0].powers - 1], 250, 213);
+			
+			ui.select = (ui.select + 4) % 4;
+			
+			if(keysDown.indexOf(87) > -1){
+				ui.select -= 1;
+			}
+			if(keysDown.indexOf(83) > -1){
+				ui.select += 1;
+			}
 			if(keysDown.indexOf(13) > -1){
-				message = false;
-				newLevel();
+				switch(ui.select){
+					case 0:
+						if(score >= upgrades.health[upgrades.healthOn]){
+							actors[0].maxhealth += 100;
+							actors[0].health += 100;
+							score -= upgrades.health[upgrades.healthOn];
+							upgrades.healthOn += 1;
+						}
+						break;
+					case 1:
+						if(score >= upgrades.energy[upgrades.energyOn]){
+							actors[0].maxenergy += 100;
+							actors[0].energy += 100;
+							score -= upgrades.energy[upgrades.energyOn];
+							upgrades.energyOn += 1;
+						}
+						break;
+					case 2:
+						if(score > upgrades.powers[actors[0].powers - 1]){
+							score -= upgrades.powers[actors[0].powers - 1];
+							actors[0].powers += 1;
+						}
+						break;
+					case 3:
+						message = false;
+						newLevel();
+						break;
+				}
 			}
 		}else{
 			context.strokeStyle = '#555';
