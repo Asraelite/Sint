@@ -109,6 +109,7 @@ function reset(){
 	moveLocked = false;
 	lookx = 0;
 	message = false;
+	endAdded = false;
 	ui = {
 		select: 0,
 		area: 0
@@ -234,7 +235,30 @@ function play(){
 	}
 	finTime = false;
 	
+	endAdded = false;
+	
+	limitLeft = 16;
+	limitRight = 1000000000;
 	camera = [actors[0]]; // Set camera.
+}
+
+function newLevel(){
+	levelNo += 1;
+	endAdded = false;
+	level = ['','','','','','','','','','','','','','','','','','','',''];
+	partsInserted = [];
+	actors = [];
+	controllers = [];
+	particles = [];
+	items = [];
+	
+	actors[0] = new Actor(0, 0, 200, 8, 200, 3, 128, 64, 16, 16);
+	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next', 0], [optionvars[6], 'prev', 0]]);
+	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule
+	
+	limitLeft = 16;
+	limitRight = 1000000000;
+	camera = [actors[0]];
 }
 
 function animate() {
@@ -429,8 +453,17 @@ function Ai(index, ai){
 				if(this.actor.xvel == 0){
 					this.aivars[0] = (1 - this.aivars[0]);
 				}
+				if(level[(this.actor.y) >> 4][((this.actor.x + 8) >> 4) + (this.aivars[0] == 0 ? 1 : -1)] != '#'){
+					this.aivars[0] = (1 - this.aivars[0]);
+				}
 				if(this.actor.box.inlava){
 					this.action('jump');
+				}
+				var distanceAway = Math.abs(actors[0].x - this.actor.x);
+				if(distanceAway < 100){
+					var angle = Math.atan2(actors[0].y - ((this.actor.y) + (distanceAway / 10)), actors[0].x - this.actor.x);
+					this.actor.vars[0] = angle;
+					this.action('en2');
 				}
 				this.action(this.aivars[0] == 0 ? 'moveRight' : 'moveLeft');
 				break;
@@ -447,6 +480,7 @@ function Ai(index, ai){
 			for(i = 0; i < 64; i++){
 				particles.push(new Particle(0, 2, 2, Math.random() * 500 + 2500, this.actor.x + ((i % 8) * 2), this.actor.y - ((i % 8) * 2), (Math.random() - 0.5) * 10, (Math.random() - 0.8) * 10, 0.4, [0.99, 0.99]));
 			}
+			score += [20, 50, 0, 0, 0, 0, 0, 0][this.actor.image - 8];
 			this.actor.x = 0;
 			this.actor.y = 0;
 		}
@@ -529,6 +563,16 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 				case 'en1':
 					if(this.energy >= 2){
 						particles.push(new Particle(0, 1, 1, Math.random() * 500 + 5000, this.x + 8, this.y - 8, Math.cos(this.vars[0]) * 15 + this.xvel, Math.sin(this.vars[0]) * 15 + this.yvel, 0.4, [0.995, 0.995]));
+						if(distanceToSound < 500){
+							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+							sound.shoot1.play();
+						}
+						this.energy -= 2;
+					}
+					break;
+				case 'en2':
+					if(this.energy >= 2){
+						particles.push(new Particle(0, 1, 1, Math.random() * 500 + 3000, this.x + 8, this.y - 8, Math.cos(this.vars[0]) * 12 + this.xvel, Math.sin(this.vars[0]) * 12 + this.yvel, 0.4, [0.994, 0.994]));
 						if(distanceToSound < 500){
 							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
 							sound.shoot1.play();
@@ -695,7 +739,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 	this.type = type;
 	this.air = airRes;
 	this.life = lifespan;
-	this.sizes = [3, 5, 7, 5];
+	this.sizes = [3, 5, 5, 3];
 	this.size = this.sizes[type];
 	this.created = this.timeup = new Date();
 	this.timeup = new Date(this.timeup.getTime() + lifespan);
@@ -852,9 +896,6 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 					actors[j].xvel += this.xvel / 8;
 					actors[j].yvel += this.yvel / 8;
 					actors[j].tookDamage = 40;
-					if(actors[j].health <= 0 && j > 0){
-						score += [20, 50, 0, 0, 0, 0, 0, 0][actors[j].image - 8];
-					}
 					this.deleteme = true;
 				}
 			}
@@ -933,22 +974,26 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 							this.xvel *= Math.pow(0.999, speed);
 							this.yvel *= Math.pow(0.999, speed);
 						}else if(lv[ycol - 1][xcol] == 'F'){
-							if(trialComplete == false){
-								var time = r((new Date().getTime() - clockStart));
-								finTime = toClock(time, 3);
-								rawFinTime = time;
-								if(cookies){
-									record[levelNo] = getCookie('trial record: ' + levelNo);
-								}
-								if(rawFinTime < record[levelNo] || record[levelNo] == false){
+							if(gameMode == 'time'){
+								if(trialComplete == false){
+									var time = r((new Date().getTime() - clockStart));
+									finTime = toClock(time, 3);
+									rawFinTime = time;
 									if(cookies){
-										setCookie('trial record: ' + levelNo, rawFinTime, 30);
+										record[levelNo] = getCookie('trial record: ' + levelNo);
 									}
-									record[levelNo] = rawFinTime;
+									if(rawFinTime < record[levelNo] || record[levelNo] == false){
+										if(cookies){
+											setCookie('trial record: ' + levelNo, rawFinTime, 30);
+										}
+										record[levelNo] = rawFinTime;
+									}
+									message = ['Level completed', 'Time : ' + finTime, 'Record : ' + toClock(record[levelNo], 3)]; // When finished time trial
 								}
-								message = ['Level completed', 'Time : ' + finTime, 'Record : ' + toClock(record[levelNo], 3)]; // When finished time trial
+								trialComplete = true;
+							}else{
+								message = 'win';
 							}
-							trialComplete = true;
 						}
 					}
 				}
@@ -1090,8 +1135,16 @@ function drawLevel(lv){ // Draw level
 				}
 				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
 			}else if(lv[i][j] == 'E'){
-				actors[actors.length] = new Actor(Math.floor(Math.random() * lvDis[levelNo]) + 8, 1, 100, 6, 50, 3, j << 4, i << 4, 16, 16);
-				ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+				switch(Math.floor(Math.random() * (lvDis[levelNo] + 0.999))){
+					case 0:
+						actors[actors.length] = new Actor(8, 1, 80, 5, 80, 3, j << 4, i << 4, 16, 16);
+						ais[ais.length] = new Ai(actors.length - 1, 'pace');
+						break;
+					case 1:
+						actors[actors.length] = new Actor(9, 1, 100, 6, 50, 3, j << 4, i << 4, 16, 16);
+						ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+						break;
+				}
 				level[i] = setStrChar(level[i], j, '.');
 			}else if(lv[i][j] == 'H'){
 				items[items.length] = new Item(0, j << 4, i << 4);
@@ -1114,31 +1167,38 @@ function loopGame(){
     speed = (thisLoop - lastLoop);
 	speed = (speed > 50 ? 50 : speed);
 	context.clearRect(0, 0, 500, 350);
-	limitLeft = 16;
-	limitRight = 16;
+	if(endAdded == 1 && lookx >= 20000 + (5000 * levelNo)){
+		limitLeft = 20000 + (5000 * levelNo);
+		for(var i = 0; i < 20; i++){
+			level[i] = setStrChar(level[i], (limitLeft >> 4) - 1, '#');
+		}
+		endAdded = 2;
+	}
 	if(game == 'playing'){
 		if(gameMode == 'free' || gameMode == 'adventure'){
-			var maxx = 0;
-			for(i in actors){
-				if(actors[i].x > maxx){
-					maxx = actors[i].x;
-				}
-			}
-			maxx += 1;
-			while(level[0].length < maxx){
+			var maxx = (actors[0].x >> 4) + 200;
+			while(level[0].length < maxx && endAdded == false){
 				partIndex = Math.floor(Math.random() * (levelparts.length - 1)) + 1;
 				partFound = false;
 				if(partsInserted.length == 0){
 					var toInsert = levelparts[0];
 					partsInserted.push([false, '5n', 1, 1, 0, 0]);
 					partFound = true;
+				}else if(level[0].length >= (20000 + (5000 * levelNo) >> 4)){
+					var toInsert = levelends[levelNo];
+					partsInserted.push([false, '5n', 1, 1, 0, 0]);
+					partFound = true;
+					actors.splice(1, actors.length - 1);
+					ais = [];
+					limitRight = 20000 + (5000 * levelNo) + toInsert[0].length + 361;
+					endAdded = 1;
 				}else{
 					thisPart = levelparts[partIndex];
 					var prevPart = partsInserted[partsInserted.length - 1];
 					if(thisPart[20] == prevPart[1] && (Math.random() * thisPart[24]) < 1 && (prevPart[5] != partIndex || Math.random() <= 0.3)){
 						if(partsInserted[partsInserted.length - 1] != thisPart || Math.random() < 0){
 							partsInserted.push([thisPart[20], thisPart[21], thisPart[22], thisPart[23], thisPart[24], partIndex]);
-							toInsert = thisPart;
+							var toInsert = thisPart;
 							partFound = true;
 						}
 					}
@@ -1148,9 +1208,6 @@ function loopGame(){
 						level[i] += toInsert[i];
 					}
 				}
-			}
-			if(gameMode == 'adventure'){
-				limitRight = 200000;
 			}
 		}else if(gameMode == 'time'){
 			level = timelevels[levelNo];
@@ -1167,11 +1224,14 @@ function loopGame(){
 	}
 	lookx /= camera.length;
 	looky /= camera.length;
-	if(lookx < limitLeft){
-		lookx = limitLeft;
-	}
-	if(lookx > limitRight && gameMode != 'free'){
-		lookx = limitRight;
+	
+	if(game == 'playing'){
+		if(lookx < limitLeft){
+			lookx = limitLeft;
+		}
+		if(lookx > limitRight && gameMode != 'free'){
+			lookx = limitRight;
+		}
 	}
 	
 	context.globalAlpha = 1;
@@ -1239,9 +1299,9 @@ function loopGame(){
 	if(mobile){
 		context.fillText('RetX: ' + r(mouse.x), 420, 290);
 		context.fillText('RetX: ' + r(mouse.y), 490, 290);
-		context.fillText('Sint mobile version α 0.6.3', 490, 310);
+		context.fillText('Sint mobile version α 0.7', 490, 310);
 	}else{
-		context.fillText('Sint version α 0.6.3', 490, 20); // β
+		context.fillText('Sint version α 0.7', 490, 20); // β
 		if(cookies && game == 'menu'){
 			context.fillText('Sint uses cookies to remember', 490, 290);
 			context.fillText('options and time trial records', 490, 310);
@@ -1267,21 +1327,39 @@ function loopGame(){
 	
 	
 	if(message){
-		context.strokeStyle = '#555';
-		context.fillStyle = '#ccc';
-		context.fillRect(100, 100, 300, 120);
-		context.strokeRect(100, 100, 300, 120);
-		context.textAlign = 'center';
-		context.fillStyle = '#9bf';
-		context.fillRect(150, 180, 200, 25);
-		context.font = '12pt Helvetica';
-		context.fillStyle = '#fff';
-		context.fillText('Enter to Continue', 250, 198);
-		for(j = 0; j < message.length; j++){
-			context.fillText(message[j], 250, 130 + (20 * j));
-		}
-		if(keysDown.indexOf(13) > -1){
-			message = false;
+		if(message == 'win'){
+			context.strokeStyle = '#555';
+			context.fillStyle = '#ccc';
+			context.fillRect(100, 75, 300, 170);
+			context.strokeRect(100, 75, 300, 170);
+			context.textAlign = 'center';
+			context.fillStyle = '#9bf';
+			context.fillRect(150, 205, 200, 25);
+			context.font = '12pt Helvetica';
+			context.fillStyle = '#fff';
+			context.fillText('Continue', 250, 223);
+			context.fillText('You have won level ' + (levelNo + 1) + '.', 250, 110);
+			if(keysDown.indexOf(13) > -1){
+				message = false;
+				newLevel();
+			}
+		}else{
+			context.strokeStyle = '#555';
+			context.fillStyle = '#ccc';
+			context.fillRect(100, 100, 300, 120);
+			context.strokeRect(100, 100, 300, 120);
+			context.textAlign = 'center';
+			context.fillStyle = '#9bf';
+			context.fillRect(150, 180, 200, 25);
+			context.font = '12pt Helvetica';
+			context.fillStyle = '#fff';
+			context.fillText('Enter to Continue', 250, 198);
+			for(j = 0; j < message.length; j++){
+				context.fillText(message[j], 250, 130 + (20 * j));
+			}
+			if(keysDown.indexOf(13) > -1){
+				message = false;
+			}
 		}
 	}
 	
@@ -1319,6 +1397,7 @@ function loopGame(){
 					play();
 					game = 'playing';
 					gameMode = 'free';
+					levelNo = 19;
 					break;
 				case 'time':
 					play();
