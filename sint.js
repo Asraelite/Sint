@@ -244,6 +244,8 @@ function play(){
 	if(cookies){
 		setCookie('options', JSON.stringify(optionvars), 30);
 	}
+	totalLevelScore = 0;
+	totalEnemies = 0;
 	finTime = false;
 	
 	endAdded = false;
@@ -258,6 +260,8 @@ function newLevel(){
 	partsInserted = [];
 	ais = [];
 	items = [];
+	totalLevelScore = 0;
+	totalEnemies = 0;
 	actors.splice(1, actors.length - 1);
 	particles.splice(1, actors.length - 1);
 	limitLeft = 16;
@@ -549,7 +553,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 					break;
 				case 1:
 					if(this.energy >= 3){
-						particles.push(new Particle(1, this.type, 4, Math.random() * 500 + 4500, this.x + 8, this.y - 8, Math.cos(angle + ((Math.random() - 0.5) * 0.03)) * 8, Math.sin(angle + ((Math.random() - 0.5) * 0.03)) * 8, 0, [0.999, 0.999]));
+						particles.push(new Particle(1, this.type, 4, Math.random() * 500 + 4500, this.x + 8, this.y - 8, Math.cos(angle + ((Math.random() - 0.5) * 0.03)) * 8, Math.sin(angle + ((Math.random() - 0.5) * 0.03)) * 8, 0, [0.999, 0.999], true, -0.3));
 						if(distanceToSound < 500){
 							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
 							sound.shoot1.play();
@@ -567,6 +571,19 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 						this.energy -= 100;
 					}
 					break;
+				case 3:
+					if(this.energy >= 80){
+						this.xvel = Math.cos(angle) * 18;
+						this.yvel = Math.sin(angle) * 15;
+						angle += Math.PI - 0.5;
+						for(var i = 0; i < 50; i++){
+							particles.push(new Particle(0, this.type, 7, 2500 + Math.random() * 1000, this.x + 8, this.y - 8, Math.cos(angle) * 3, Math.sin(angle) * 3, 0.5, [0.9985, 0.9985], false, -0.8));
+							angle += 0.02;
+						}
+						this.energy -= 80;
+						sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+						sound.shoot1.play();
+					}
 				case 'en1':
 					if(this.energy >= 2){
 						particles.push(new Particle(0, 1, 1, Math.random() * 500 + 5000, this.x + 8, this.y - 8, Math.cos(this.vars[0]) * 15 + this.xvel, Math.sin(this.vars[0]) * 15 + this.yvel, 0.4, [0.995, 0.995]));
@@ -606,7 +623,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 					break;
 				case 'current':
 					this.action(this.select);
-					if(this.select == 2){
+					if(this.select == 2 || this.select == 3){
 						return true;
 					}
 					break;
@@ -658,7 +675,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 				this.xvel = 0;
 				this.yvel = 0;
 				this.health = this.maxhealth;
-				score -= 50;
+				score -= 50 * levelNo;
 				clockStart = new Date().getTime();
 			}
 		}
@@ -728,6 +745,11 @@ function Item(type, xpos, ypos){
 						sound.point.volume = optionvars[1] / 150;
 						sound.point.play();
 						break;
+					case 5:
+						score += 50;
+						sound.point.volume = optionvars[1] / 150;
+						sound.point.play();
+						break;
 				}
 				this.deleteme = true;
 			}
@@ -735,12 +757,13 @@ function Item(type, xpos, ypos){
 	}
 }
 
-function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel, gravity, airRes, actDeath){
+function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel, gravity, airRes, actDeath, bounce){
 	this.gravity = typeof gravty !== 'undefined' ? gravity : 1;
 	this.x = xpos;
 	this.y = ypos;
 	this.drawType = drawType;
 	this.actDeath = typeof actDeath === 'undefined' ? true : actDeath;
+	this.bounce = typeof bounce === 'undefined' ? 0 : bounce;
 	this.xvel = xvel;
 	this.yvel = yvel;
 	this.type = type;
@@ -756,7 +779,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 	var angle = Math.random() * 360;
 	this.addx = Math.sin(angle) * ((particles.length + 200) / 5);
 	this.addy = Math.cos(angle) * ((particles.length + 200) / 10);
-	this.box = new Box(this.x, this.y, this.size, this.size, this.xvel, this.yvel, 1, gravity, this.air);
+	this.box = new Box(this.x, this.y, this.size, this.size, this.xvel, this.yvel, 1, gravity, this.air, this.bounce);
 	this.box.unstuck();
 	
 	this.drawBox = function(alpha, width, color, size, fill, rel){
@@ -774,6 +797,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 			}
 		}
 		context.stroke();
+		context.globalAlpha = 1;
 	};
 	
 	this.draw = function(extendSize){
@@ -808,6 +832,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 					this.drawBox(1, 1 * extendSize, '#93b', 2 * extendSize);
 					break;
 				case 7:
+					this.drawBox(1, 1 * extendSize, '#f95', 2 * extendSize);
 					break;
 			}
 			context.globalAlpha = 1;
@@ -820,21 +845,33 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 			// 293;
 			this.x = 480.5 - (35 * k);
 			this.y = 293.5;
+			var unlocked = ((actors[0].powers - 1) >= k ? 1 : 5);
 			switch(k){
 				case 0:
 					this.x -= 2;
 					this.y -= 2;
-					this.drawBox(1, 1.5, '#66b', 4, false, 0);
+					this.drawBox((1 / unlocked), 1.5, '#66b', 4, false, 0);
 					break;
 				case 1:
 					this.x -= 3;
 					this.y -= 3;
-					this.drawBox(0.8, 2, '#229', 6, false, 0);
+					this.drawBox((0.8 / unlocked), 2, '#229', 6, false, 0);
 					break;
 				case 2:
 					this.x -= 5;
 					this.y -= 5;
-					this.drawBox(1, 3, '#93b', 10, '#b7f', 0);
+					this.drawBox((1 / unlocked), 3, '#93b', 10, '#b7f', 0);
+					break;
+				case 3:
+					this.x -= 2;
+					this.y -= 6;
+					this.drawBox((1 / unlocked), 1.5, '#f95', 4, false, 0);
+					this.x += 6;
+					this.y += 8;
+					this.drawBox((1 / unlocked), 1.5, '#f95', 4, false, 0);
+					this.x -= 12;
+					this.drawBox((1 / unlocked), 1.5, '#f95', 4, false, 0);
+					break;
 			}
 		}
 		this.drawType = 'mouse';
@@ -925,7 +962,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 }
 
 // Collision detection class
-function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
+function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes, bounce){
 	this.x = x;
 	this.y = y;
 	this.width = w;
@@ -937,6 +974,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 	this.down = false;
 	this.gravity = gravity;
 	this.air = (typeof airRes === 'undefined' ? [0.99, 1] : airRes);
+	this.bounce = (typeof bounce === 'undefined' ? 0 : bounce);
 	this.health = 0;
 	this.inlava = false;
 	this.setX = false;
@@ -1049,7 +1087,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 				}else{
 					this.x = ((this.x >> 4) << 4) + (this.xvel > 0 ? 16 - (((this.width - 1) % 16) + 1) : 16);
 				}
-				this.xvel = 0;
+				this.xvel = this.xvel * this.bounce;
 				velToKill = 0;
 			}
 		}
@@ -1074,7 +1112,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes){
 				if(this.yvel < 0){
 					this.down = true;
 				}
-				this.yvel = 0;
+				this.yvel = this.yvel * this.bounce;
 				velToKill = 0;
 			}
 		}
@@ -1142,22 +1180,29 @@ function drawLevel(lv){ // Draw level
 				}
 				context.fillRect((j << 4) - r(lookx), i << 4, 16, 16);
 			}else if(lv[i][j] == 'E'){
-				switch(Math.floor(Math.random() * (lvDis[levelNo] + 0.999))){
-					case 0:
-						actors[actors.length] = new Actor(8, 1, 80, 5, 80, 3, j << 4, i << 4, 16, 16);
-						ais[ais.length] = new Ai(actors.length - 1, 'pace');
-						break;
-					case 1:
-						actors[actors.length] = new Actor(9, 1, 100, 6, 50, 3, j << 4, i << 4, 16, 16);
-						ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
-						break;
+				var enemyToAdd = Math.floor(Math.random() * (lvDis[levelNo] + 0.999));
+				if(endAdded || totalEnemies < (level[0].length / 100)){
+					switch(enemyToAdd){
+						case 0:
+							actors[actors.length] = new Actor(8, 1, 80, 5, 80, 3, j << 4, i << 4, 16, 16);
+							ais[ais.length] = new Ai(actors.length - 1, 'pace');
+							break;
+						case 1:
+							actors[actors.length] = new Actor(9, 1, 100, 6, 50, 3, j << 4, i << 4, 16, 16);
+							ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+							break;
+					}
+					totalEnemies += 1;
 				}
 				level[i] = setStrChar(level[i], j, '.');
 			}else if(lv[i][j] == 'H'){
 				items[items.length] = new Item(0, j << 4, i << 4);
 				level[i] = setStrChar(level[i], j, '.');
 			}else if(parseInt(lv[i][j]) > -1){
-				items[items.length] = new Item(parseInt(lv[i][j]) + 2, j << 4, i << 4);
+				if(endAdded || totalLevelScore < (level[0].length / 20) * (levelNo + 2)){
+					items[items.length] = new Item(parseInt(lv[i][j]) + 2, j << 4, i << 4);
+					totalLevelScore += [5, 10, 20, 50][lv[i][j]];
+				}
 				level[i] = setStrChar(level[i], j, '.');
 			}
 		}
@@ -1191,7 +1236,7 @@ function loopGame(){
 					var toInsert = levelparts[0];
 					partsInserted.push([false, '5n', 1, 1, 0, 0]);
 					partFound = true;
-				}else if(level[0].length >= (20000 + (5000 * levelNo) >> 4)){
+				}else if(level[0].length >= (20000 + (5000 * levelNo) >> 4) && gameMode == 'adventure'){
 					var toInsert = levelends[levelNo];
 					partsInserted.push([false, '5n', 1, 1, 0, 0]);
 					partFound = true;
@@ -1219,6 +1264,10 @@ function loopGame(){
 		}else if(gameMode == 'time'){
 			level = timelevels[levelNo];
 			limitRight = (level[0].length << 4) - 516;
+		}
+		
+		if(limitLeft < actors[0].x - 8000){
+			limitLeft = actors[0].x - 8000;
 		}
 	}
 	for(i in controllers){
@@ -1306,9 +1355,9 @@ function loopGame(){
 	if(mobile){
 		context.fillText('RetX: ' + r(mouse.x), 420, 290);
 		context.fillText('RetX: ' + r(mouse.y), 490, 290);
-		context.fillText('Sint mobile version α 0.7.1', 490, 310);
+		context.fillText('Sint mobile version α 0.7.2', 490, 310);
 	}else{
-		context.fillText('Sint version α 0.7.1', 490, 20); // β
+		context.fillText('Sint version α 0.7.2', 490, 20); // β
 		if(cookies && game == 'menu'){
 			context.fillText('Sint uses cookies to remember', 490, 290);
 			context.fillText('options and time trial records', 490, 310);
@@ -1359,9 +1408,9 @@ function loopGame(){
 			context.fillText('Points: ' + score, 250, 125);
 			context.fillStyle = (ui.select == 3 ? 'fff' : '#eef');
 			context.fillText('Continue', 250, 253);
-			context.fillStyle = (score < upgrades.health[upgrades.healthOn] ? (ui.select == 0 ? '#f98' : '#fcd') : (ui.select == 2 ? '#fff' : '#eef'));
+			context.fillStyle = (score < upgrades.health[upgrades.healthOn] ? (ui.select == 0 ? '#f98' : '#fcd') : (ui.select == 0 ? '#fff' : '#eef'));
 			context.fillText('Upgrade health +100: ' + upgrades.health[upgrades.healthOn], 250, 153);
-			context.fillStyle = (score < upgrades.energy[upgrades.energyOn] ? (ui.select == 1 ? '#f98' : '#fcd') : (ui.select == 2 ? '#fff' : '#eef'));
+			context.fillStyle = (score < upgrades.energy[upgrades.energyOn] ? (ui.select == 1 ? '#f98' : '#fcd') : (ui.select == 1 ? '#fff' : '#eef'));
 			context.fillText('Upgrade max energy +100: ' + upgrades.energy[upgrades.energyOn], 250, 183);
 			context.fillStyle = (score < upgrades.powers[actors[0].powers - 1] && actors[0].powers < 8 ? (ui.select == 2 ? '#f98' : '#fcd') : (ui.select == 2 ? '#fff' : '#eef'));
 			context.fillText('Unlock next power: ' + upgrades.powers[actors[0].powers - 1], 250, 213);
@@ -1459,6 +1508,11 @@ function loopGame(){
 					game = 'playing';
 					gameMode = 'free';
 					levelNo = 19;
+					actors[0].powers = 8;
+					actors[0].maxhealth = 500;
+					actors[0].health = 500;
+					actors[0].maxenergy = 500;
+					actors[0].energy = 500;
 					break;
 				case 'time':
 					play();
