@@ -86,16 +86,17 @@ function reset(){
 	keysDown = [];
 	test = [];
 	level = ['','','','','','','','','','','','','','','','','','','',''];
-	lvDis = [0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 7, 8];
+	lvDis = [0, 0, 1, 1, 1, 2, 2];
 	upgrades = {
 		health: [300, 500, 800, 1200, 1700, 2300, 3000],
 		energy: [200, 350, 600, 1000, 1500, 2000, 2600],
-		powers: [400, 800, 1500, 2500, 4000, 6500, 10000],
+		powers: [400, 800, 1500, 2500, 4000/*, 6500, 10000*/],
 		healthOn: 0,
 		energyOn: 0
 	}
 	unlockKey = [0, 3, 5, 8, 11, 13, 15, 17, 20];
 	score = 0;
+	lives = 3;
 	record = [false, false, false];
 	partsInserted = [];
 	cookies = false;
@@ -133,9 +134,16 @@ function reset(){
 	finTime = false;
 	sound = {
 		shoot1: new Audio('sfx2.wav'),
+		shoot2: new Audio('shoot.wav'),
+		shoot3: new Audio('shoot_2.wav'),
+		shoot4: new Audio('shoot_3.wav'),
+		
 		point: new Audio('point.wav'),
+		point2: new Audio('point_score_2.wav'),
+		point3: new Audio('point_score.wav'),
+		
 		explode: new Audio('explode.wav'),
-		jump: new Audio('Funk.mp3')
+		jump: new Audio('jump_up2.wav')
 	}
 	music = {
 		dash: {
@@ -174,7 +182,7 @@ function reset(){
 			['Back', 0, true]
 		],
 		['r', 'play'],
-		['t', 'Sint', '', 'Programming and graphics by Markus Scully (Asraelite)', 'Sound and music by Christian Stryczynski and Asraelite'],
+		['t', 'Sint', '', 'Programming and graphics by Markus Scully (Asraelite)', 'Sound by Christian Stryczynski and Asraelite'],
 		[
 			['"Super Awesome Carrot" by Josh', 8, 0, 'tl'],
 			['"Duck" by Asraelite', 8, 1, 'tl'],
@@ -230,6 +238,7 @@ function toMenu(){
 	ui.area = 0;
 	ui.select = 0;
 	score = 0;
+	lives = 3;
 	tomenu = false;
 }
 
@@ -240,7 +249,8 @@ function play(){
 	actors[0] = new Actor(0, 0, 200, 8, 200, 3, limitLeft + 112, 64, 16, 16);
 	controllers[0] = new Controller(actors[0], [[optionvars[4], 'moveRight'], [optionvars[3], 'moveLeft'], [optionvars[2], 'jump'], [27, 'quit'], [90, 'suicide', 0], ['c', 'current'], [optionvars[5], 'next', 0], [optionvars[6], 'prev', 0]]);
 	
-	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule
+	particles[0] = new Particle('mouse', 0, 'mouse', 10000000000, 0, 0, 0, 0, 0, [0, 0]); // Create reticule]
+	
 	if(cookies){
 		setCookie('options', JSON.stringify(optionvars), 30);
 	}
@@ -263,7 +273,7 @@ function newLevel(){
 	totalLevelScore = 0;
 	totalEnemies = 0;
 	actors.splice(1, actors.length - 1);
-	particles.splice(1, actors.length - 1);
+	particles.splice(1, particles.length - 1);
 	limitLeft = 16;
 	limitRight = 1000000000;
 	actors[0].x = limitLeft + 112;
@@ -297,10 +307,21 @@ function r(num){
 	return Math.round(num);
 }
 
-function spawn(no){
+function spawn(no, enemy){
+	enemy = typeof enemy === 'undefined' ? 1 : enemy;
+	no = typeof no === 'undefined' ? 1 : no;
 	for(i = 0 ; i < no; i++){
-		actors[actors.length] = new Actor(7, 1, 1, 6, 50, 3, lookx + 250 + ((Math.random() - 0.5) * 200), 0, 16, 16);
-		ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+		var x = lookx + 250 + ((Math.random() - 0.5) * 200);
+		switch(enemy){
+			case 0:
+				actors[actors.length] = new Actor(8, 1, 80, 5, 80, 3, x, 0, 16, 16);
+				ais[ais.length] = new Ai(actors.length - 1, 'pace');
+				break;
+			case 1:
+				actors[actors.length] = new Actor(9, 1, 100, 6, 50, 3, x, 0, 16, 16);
+				ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+				break;
+		}
 	}
 }
 
@@ -426,7 +447,7 @@ function Ai(index, ai){
 	}
 	this.run = function(){
 		switch(ai){
-			case 'alphaBot':
+			case 'alphaBot': // Basic following and jumping
 				var topDistance = 400;
 				var distanceAway = Math.abs(actors[0].x - this.actor.x);
 				if(distanceAway < topDistance){
@@ -446,6 +467,12 @@ function Ai(index, ai){
 					if(this.aivars[0] == 0 && this.actor.energy >= this.actor.maxenergy){
 						this.aivars[0] = 1;
 					}
+					try{
+					if((level[(this.actor.y) >> 4][((this.actor.x + 8) >> 4) + (this.aivars[0] == 0 ? 1 : -1)] != '#' && actors[0].y <= this.actor.y) || this.actor.box.inlava){
+						this.action('jump');
+					}
+					}catch(err){
+					}
 					var inverter = (distanceAway > this.aivars[1] ? 0 : 1);
 					if(Math.abs(distanceAway - this.aivars[1]) > 20 && Math.random() < 0.9){
 						if(this.actor.x > actors[0].x){
@@ -464,8 +491,11 @@ function Ai(index, ai){
 				if(this.actor.xvel == 0){
 					this.aivars[0] = (1 - this.aivars[0]);
 				}
-				if(level[(this.actor.y) >> 4][((this.actor.x + 8) >> 4) + (this.aivars[0] == 0 ? 1 : -1)] != '#'){
-					this.aivars[0] = (1 - this.aivars[0]);
+				try{
+					if(level[(this.actor.y) >> 4][((this.actor.x + 8) >> 4) + (this.aivars[0] == 0 ? 1 : -1)] != '#'){
+						this.aivars[0] = (1 - this.aivars[0]);
+					}
+				}catch(err){
 				}
 				if(this.actor.box.inlava){
 					this.action('jump');
@@ -478,6 +508,67 @@ function Ai(index, ai){
 				}
 				this.action(this.aivars[0] == 0 ? 'moveRight' : 'moveLeft');
 				break;
+			case 'fly': // Flying AI
+				if(this.aivars[1]){
+					this.aivars[0] = 6;
+				}else{
+					this.aivars[0] = 3;
+				}
+				var bottom = false;
+				var aboveBottom = false;
+				try{
+				for(var i = -3; i <= 3; i++){
+					for(var j = 1; j < this.aivars[0] + 1; j++){
+						if(level[((this.actor.y) >> 4) + j][((this.actor.x + 8) >> 4) + i] == '#'){
+							if(j <= this.aivars[0]){
+								bottom = true;
+							}else{
+								aboveBottom = true;
+							}
+						}
+					}
+				}
+				}catch(err){
+					bottom = false;
+				}
+				if(this.actor.y <= 30){
+					bottom = false;
+				}
+				if(!this.aivars[2]){
+					this.aivars[2] = 70 + (Math.random() * 100);
+				}
+				var distanceAway = Math.abs(actors[0].x - this.actor.x);
+				if(distanceAway < 500 && distanceAway > this.aivars[2]){
+					this.action(actors[0].x > this.actor.x ? 'moveRight' : 'moveLeft');
+				}
+				if(distanceAway < 50 + this.aivars[2] && !this.aivars[1] && Math.random() < 0.5){
+					var angle = Math.atan2(actors[0].y - this.actor.y, actors[0].x - this.actor.x);
+					this.actor.vars[0] = angle;
+					this.action('en3');
+				}
+				if(this.actor.energy <= 5){
+					this.aivars[1] = true;
+				}
+				if(this.actor.energy == this.actor.maxenergy){
+					this.aivars[1] = false;
+				}
+				if(bottom){
+					this.actor.yvel -= 0.2;
+				}else{
+					if(aboveBottom){
+						this.actor.yvel *= 0.8;
+					}else{
+						this.actor.yvel += 0.2;
+					}
+				}
+				this.actor.yvel *= 0.98;
+				if(Math.abs(this.actor.yvel) >= 2){
+					this.actor.yvel *= 0.7;
+				}
+				break;
+			case 'boss':
+				
+				break;
 			case 'still':
 				break;
 			case 'test': // Jumping AI
@@ -488,10 +579,12 @@ function Ai(index, ai){
 		if(this.actor.health < 0){
 			this.deleteme = true;
 			this.actor.deleteme = true;
-			for(i = 0; i < 64; i++){
-				particles.push(new Particle(0, 2, 2, Math.random() * 500 + 2500, this.actor.x + ((i % 8) * 2), this.actor.y - ((i % 8) * 2), (Math.random() - 0.5) * 10, (Math.random() - 0.8) * 10, 0.4, [0.99, 0.99]));
+			var w = this.actor.w / 2;
+			var h = this.actor.h / 2;
+			for(i = 0; i < w * h; i++){
+				particles.push(new Particle(0, 2, 2, Math.random() * 500 + 2500, this.actor.x + ((i % w) * 2), this.actor.y - ((i % h) * 2), (Math.random() - 0.5) * 10, (Math.random() - 0.8) * 10, 0.4, [0.99, 0.99]));
 			}
-			score += [20, 50, 0, 0, 0, 0, 0, 0][this.actor.image - 8];
+			score += [20, 50, 100, 1000, 0, 0, 0, 0][this.actor.image - 8];
 			this.actor.x = 0;
 			this.actor.y = 0;
 		}
@@ -499,10 +592,11 @@ function Ai(index, ai){
 }
 
 // Actor class for all solid cubes
-function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width, height, ai){
+function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width, height, ai, gravity){
 	this.image = image;
 	this.ai = typeof ai === 'undefined' ? false : ai;
 	this.group = type;
+	this.gravity = typeof gravity === 'undefined' ? true : gravity;
 	this.health = health;
 	this.maxhealth = health;
 	this.energy = energy;
@@ -510,7 +604,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 	this.speed = moveSpeed;
 	this.tookDamage = 0;
 	this.select = 0;
-	this.powers = 1;
+	this.powers = 6;
 	this.yvel = 0;
 	this.xvel = 0;
 	this.imageLoad = 2;
@@ -521,7 +615,7 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 	this.y = ypos;
 	this.w = width;
 	this.h = height;
-	this.box = new Box(this.x, this.y, this.w, this.h, this.xvel, this.yvel, 0, true);
+	this.box = new Box(this.x, this.y, this.w, this.h, this.xvel, this.yvel, 0, this.gravity);
 	this.oneactions = [];
 	this.actionsturn = [];
 	this.index = actors.length;
@@ -584,6 +678,27 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 						sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
 						sound.shoot1.play();
 					}
+					break;
+				case 4:
+					if(this.energy >= 5){
+						particles.push(new Particle(4, 2, 8, 20000, this.x + 8, this.y - 8, Math.cos(angle + ((Math.random() - 0.5) * 0.03)) * 10, Math.sin(angle + ((Math.random() - 0.5) * 0.03)) * 10, 0, [0.999, 0.999], true, -0.6));
+						if(distanceToSound < 500){
+							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+							sound.shoot1.play();
+						}
+						this.energy -= 5;
+					}
+					break;
+				case 5:
+					if(this.energy >= 6){
+						particles.push(new Particle(5, this.type, 10, Math.random() * 500 + 5000, this.x + 8, this.y - 8, Math.cos(angle) * 18 + this.xvel, Math.sin(angle) * 18 + this.yvel, 0.25, [0.9985, 0.9985]));
+						if(distanceToSound < 500){
+							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+							sound.shoot1.play();
+						}
+						this.energy -= 6;
+					}
+					break;
 				case 'en1':
 					if(this.energy >= 2){
 						particles.push(new Particle(0, 1, 1, Math.random() * 500 + 5000, this.x + 8, this.y - 8, Math.cos(this.vars[0]) * 15 + this.xvel, Math.sin(this.vars[0]) * 15 + this.yvel, 0.4, [0.995, 0.995]));
@@ -602,6 +717,16 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 							sound.shoot1.play();
 						}
 						this.energy -= 2;
+					}
+					break;
+				case 'en3':
+					if(this.energy >= 3){
+						particles.push(new Particle(1, 1, 9, Math.random() * 500 + 3000, this.x + 8, this.y - 8, Math.cos(this.vars[0]) * 10 + this.xvel, Math.sin(this.vars[0]) * 10 + this.yvel, 0, [0.9987, 0.9987], true, -0.6));
+						if(distanceToSound < 500){
+							sound.shoot1.volume = (r(distanceToSound < 100 ? 1 : (500 - distanceToSound) / 400) * optionvars[1]) / 100;
+							sound.shoot1.play();
+						}
+						this.energy -= 3;
 					}
 					break;
 				case 'moveLeft':
@@ -669,13 +794,19 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 				if(gameMode == 'free'){
 					this.y = -500;
 				}else{
-					this.x = limitLeft + 112;
-					this.y = 64;
+					if(--lives >= 0){
+						this.x = limitLeft + 112;
+						this.y = 64;
+					}else{
+						message = ['Game Over', 'You have 0 lives left :(', 'Score: ' + score];
+						this.y = -10;
+						lives++;
+					}
 				}
-				this.xvel = 0;
-				this.yvel = 0;
 				this.health = this.maxhealth;
 				score -= 50 * levelNo;
+				this.xvel = 0;
+				this.yvel = 0;
 				clockStart = new Date().getTime();
 			}
 		}
@@ -690,14 +821,14 @@ function Actor(image, type, health, moveSpeed, energy, powers, xpos, ypos, width
 	this.draw = function(){
 		var drawx = r(this.x - lookx + this.xvel);
 		var drawy = 200;
-		context.drawImage(spritesheet, (this.image % 8) * 16, Math.floor(this.image / 8) * 16, 16, 16, drawx, r(this.y - 16 - looky), this.w, this.h);
+		context.drawImage(spritesheet, (this.image % 8) * 16, Math.floor(this.image / 8) * 16, this.w, this.h, drawx, r(this.y - 16 - looky), this.w, this.h);
 		context.globalAlpha = 1;
 		if(this.tookDamage > 0 && this.image != 0){
 			context.strokeStyle = '#555';
 			context.fillStyle = '#c54';
-			context.fillRect(r((this.x - lookx) + 8 + camera[0].xvel) - 10 - 0.5, r(this.y) - 23.5, (this.health / this.maxhealth) * 20, 5);
-			context.strokeRect(r((this.x - lookx) + 8 + camera[0].xvel) - 10 - 0.5, r(this.y) - 23.5, 20, 5);
-			this.tookDamage -= 0.05 * speed;
+			context.fillRect(r((this.x - lookx) + (this.w / 2) + camera[0].xvel) - 10 - 0.5, r(this.y) - (15.5 + (this.h / 2)), (this.health / this.maxhealth) * (this.w * 1.2), 5);
+			context.strokeRect(r((this.x - lookx) + (this.w / 2) + camera[0].xvel) - 10 - 0.5, r(this.y) - (15.5 + (this.h / 2)), this.w * 1.2, 5);
+			this.tookDamage -= (1 / this.w) * speed;
 		}
 	}
 }
@@ -722,13 +853,19 @@ function Item(type, xpos, ypos){
 			if(this.x + 16 > act.x && this.x < act.x + act.w){
 				switch(this.type){
 					case 0:
-						actors[0].health += 100;
-						if(actors[0].health > actors[0].maxhealth){
-							actors[0].health = actors[0].maxhealth;
+						if(actors[0].health < actors[0].maxhealth){
+							actors[0].health += 100;
+							if(actors[0].health > actors[0].maxhealth){
+								actors[0].health = actors[0].maxhealth;
+							}
+							sound.point3.volume = optionvars[1] / 150;
+							sound.point3.play();
 						}
 						break;
 					case 1:
-						
+						lives += 1;
+						sound.point3.volume = optionvars[1] / 150;
+						sound.point3.play();
 						break;
 					case 2:
 						score += 5;
@@ -747,6 +884,16 @@ function Item(type, xpos, ypos){
 						break;
 					case 5:
 						score += 50;
+						sound.point.volume = optionvars[1] / 150;
+						sound.point.play();
+						break;
+					case 6:
+						score += 100;
+						sound.point.volume = optionvars[1] / 150;
+						sound.point.play();
+						break;
+					case 7:
+						score += 300;
 						sound.point.volume = optionvars[1] / 150;
 						sound.point.play();
 						break;
@@ -769,7 +916,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 	this.type = type;
 	this.air = airRes;
 	this.life = lifespan;
-	this.sizes = [3, 5, 5, 3];
+	this.sizes = [3, 5, 5, 3, 5, 3];
 	this.size = this.sizes[type];
 	this.created = this.timeup = new Date();
 	this.timeup = new Date(this.timeup.getTime() + lifespan);
@@ -834,15 +981,22 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 				case 7:
 					this.drawBox(1, 1 * extendSize, '#f95', 2 * extendSize);
 					break;
+				case 8:
+					this.drawBox(1, 2 * extendSize, '#7bb', 3 * extendSize);
+					break;
+				case 9:
+					this.drawBox(1, 1 * extendSize, '#b32', 4 * extendSize);
+					break;
+				case 10:
+					this.drawBox(1, 1 * extendSize, '#363', 2 * extendSize);
+					break;
 			}
 			context.globalAlpha = 1;
 		}
 	}
 	
 	this.drawIcons = function(){
-		for(var k = 0; k < 8; k++){
-			//(480 - (k * 35)) + lookx;
-			// 293;
+		for(var k = 0; k < 6; k++){
 			this.x = 480.5 - (35 * k);
 			this.y = 293.5;
 			var unlocked = ((actors[0].powers - 1) >= k ? 1 : 5);
@@ -871,6 +1025,16 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 					this.drawBox((1 / unlocked), 1.5, '#f95', 4, false, 0);
 					this.x -= 12;
 					this.drawBox((1 / unlocked), 1.5, '#f95', 4, false, 0);
+					break;
+				case 4:
+					this.x -= 5;
+					this.y -= 5;
+					this.drawBox((1 / unlocked), 3, '#7bb', 10, false, 0);
+					break;
+				case 5:
+					this.x -= 2;
+					this.y -= 2;
+					this.drawBox((1 / unlocked), 1.5, '#363', 4, false, 0);
 					break;
 			}
 		}
@@ -928,6 +1092,20 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 				break;
 			case 3:
 				break;
+			case 4:
+				for(var i in actors){
+					if(i > 0){
+						var a = actors[i];
+						var dis = Math.sqrt(((a.x - this.x) * (a.x - this.x)) + ((a.y - this.y) * (a.y - this.y))) + 10;
+						var pull = 1 / Math.pow(dis, 2);
+						var angleTo = Math.atan2(a.y - this.y, a.x - this.x);
+						this.xvel += 10000 * Math.cos(angleTo) * pull;
+						this.yvel += 10000 * Math.sin(angleTo) * pull;
+					}
+				}
+				break;
+			case 5:
+				break;
 			default:
 				break;
 		}
@@ -936,7 +1114,7 @@ function Particle(type, affiliation, drawType, lifespan, xpos, ypos, xvel, yvel,
 			var act = actors[j];
 			if(this.y + 16 < act.y + act.h && this.y + 16 + this.size > act.y){
 				if(this.x + this.size > act.x && this.x < act.x + act.w && (this.aff == 1 ? j == 0 : j > 0)){
-					actors[j].health -= (Math.abs(this.xvel) + Math.abs(this.yvel)) / [10, 3, 0.2, 2][this.type];
+					actors[j].health -= (Math.abs(this.xvel) + Math.abs(this.yvel)) / [10, 3, 0.2, 2, 8, 3, 0.5][this.type];
 					actors[j].xvel += this.xvel / 8;
 					actors[j].yvel += this.yvel / 8;
 					actors[j].tookDamage = 40;
@@ -1005,41 +1183,46 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes, bounce){
 				var xcol = (((this.x - (hr == colareax - 1 ? 1 + 16 - (((this.width - 1) % 16) + 1): 0)) >> 4) + hr); // This is a bit complicated...
 				var ycol = (((this.y - (vr == colareay - 1 ? 1 + 16 - (((this.height - 1) % 16) + 1) : 0)) >> 4) + vr); // It will get the number of 16x16...
 				if(ycol - 1 >= 0 && ycol <= lv.length){ // Blocks it takes to cover the entire actor or particle. E.g. something 8x8 needs 2 xcol and 2 ycol,
-					if(xcol >= 0 && xcol < lv[ycol].length){ // This is because it could be on the border between 2 blocks, covering up to 4 of them.
-						if(lv[ycol - 1][xcol] == '#'){ // If normal block
-							collision = true;
-						}else if(lv[ycol - 1][xcol] == 'x'){ // If in lava
-							this.health -= 0.01 * speed;
-							this.inlava = true;
+					try{
+						if(xcol >= 0 && xcol < lv[ycol].length){ // This is because it could be on the border between 2 blocks, covering up to 4 of them.
+							if(lv[ycol - 1][xcol] == '#'){ // If normal block
+								collision = true;
+							}else if(lv[ycol - 1][xcol] == 'x'){ // If in lava
+								this.health -= 0.01 * speed;
+								this.inlava = true;
 							
-							this.xvel *= Math.pow(0.997, speed); // Slow down velocity
-							this.yvel *= Math.pow(0.997, speed);
-						}else if(lv[ycol - 1][xcol] == 'w'){ // If in water
-							this.inlava = true;
-							this.xvel *= Math.pow(0.999, speed);
-							this.yvel *= Math.pow(0.999, speed);
-						}else if(lv[ycol - 1][xcol] == 'F' && actors[0].box == this){
-							if(gameMode == 'time'){
-								if(trialComplete == false){
-									var time = r((new Date().getTime() - clockStart));
-									finTime = toClock(time, 3);
-									rawFinTime = time;
-									if(cookies){
-										record[levelNo] = getCookie('trial record: ' + levelNo);
-									}
-									if(rawFinTime < record[levelNo] || record[levelNo] == false){
+								this.xvel *= Math.pow(0.997, speed); // Slow down velocity
+								this.yvel *= Math.pow(0.997, speed);
+							}else if(lv[ycol - 1][xcol] == 'w'){ // If in water
+								this.inlava = true;
+								this.xvel *= Math.pow(0.999, speed);
+								this.yvel *= Math.pow(0.999, speed);
+							}else if(lv[ycol - 1][xcol] == 'F' && actors[0].box == this){
+								if(gameMode == 'time'){
+									if(trialComplete == false){
+										var time = r((new Date().getTime() - clockStart));
+										finTime = toClock(time, 3);
+										rawFinTime = time;
 										if(cookies){
-											setCookie('trial record: ' + levelNo, rawFinTime, 30);
+											record[levelNo] = getCookie('trial record: ' + levelNo);
 										}
-										record[levelNo] = rawFinTime;
+										if(rawFinTime < record[levelNo] || record[levelNo] == false){
+											if(cookies){
+												setCookie('trial record: ' + levelNo, rawFinTime, 30);
+											}
+											record[levelNo] = rawFinTime;
+										}
+										message = ['Level completed', 'Time : ' + finTime, 'Record : ' + toClock(record[levelNo], 3)]; // When finished time trial
 									}
-									message = ['Level completed', 'Time : ' + finTime, 'Record : ' + toClock(record[levelNo], 3)]; // When finished time trial
+									trialComplete = true;
+								}else{
+									message = 'win';
 								}
-								trialComplete = true;
-							}else{
-								message = 'win';
 							}
 						}
+					}catch(err){
+						console.error('Physics error at ' + xcol + ', ' + ycol + '. ' + particles.length + '\n' + err);
+						this.y = 0;
 					}
 				}
 			}
@@ -1047,7 +1230,7 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes, bounce){
 		if(this.col == 0){
 			for(j in actors){ // Check if colliding with another actor
 				var obj = actors[j];
-				if(this.y < obj.y + obj.h && this.y + obj.h > obj.y && this.x + obj.w > obj.x && this.x < obj.x + obj.w && obj.box != this){
+				if(this.y < obj.y + obj.h && this.y + this.height > obj.y && this.x + this.width > obj.x && this.x < obj.x + obj.w && obj.box != this){
 					collision = true;
 					var inv = this.xvel > 0;
 					if(this.y < obj.y - this.height - 1 || this.y > obj.y + obj.h + 1){
@@ -1137,6 +1320,9 @@ function Box(x, y, w, h, xvel, yvel, colgroup, gravity, airRes, bounce){
 		if(j >= limit){
 			this.x = originalx;
 			this.y = originaly;
+			return false;
+		}else{
+			return true;
 		}
 	}
 	
@@ -1184,21 +1370,32 @@ function drawLevel(lv){ // Draw level
 				if(endAdded || totalEnemies < (level[0].length / 100)){
 					switch(enemyToAdd){
 						case 0:
-							actors[actors.length] = new Actor(8, 1, 80, 5, 80, 3, j << 4, i << 4, 16, 16);
+							actors[actors.length] = new Actor(8, 1, 80, 5, 80, 1, j << 4, i << 4, 16, 16);
 							ais[ais.length] = new Ai(actors.length - 1, 'pace');
 							break;
 						case 1:
-							actors[actors.length] = new Actor(9, 1, 100, 6, 50, 3, j << 4, i << 4, 16, 16);
+							actors[actors.length] = new Actor(9, 1, 100, 6, 50, 2, j << 4, i << 4, 16, 16);
 							ais[ais.length] = new Ai(actors.length - 1, 'alphaBot');
+							break;
+						case 2:
+							actors[actors.length] = new Actor(10, 1, 120, 5, 50, 3, j << 4, i << 4, 16, 16, false, 0);
+							ais[ais.length] = new Ai(actors.length - 1, 'fly');
 							break;
 					}
 					totalEnemies += 1;
 				}
 				level[i] = setStrChar(level[i], j, '.');
+			}else if(lv[i][j] == 'B'){
+				actors[actors.length] = new Actor(11, 1, 600, 3, 200, 5, j << 4, i << 4, 32, 32);
+				ais[ais.length] = new Ai(actors.length - 1, 'boss');
+				level[i] = setStrChar(level[i], j, '.');
 			}else if(lv[i][j] == 'H'){
 				items[items.length] = new Item(0, j << 4, i << 4);
 				level[i] = setStrChar(level[i], j, '.');
-			}else if(parseInt(lv[i][j]) > -1){
+			}else if(lv[i][j] == 'L'){
+				items[items.length] = new Item(1, j << 4, i << 4);
+				level[i] = setStrChar(level[i], j, '.');
+			}else if(parseInt(lv[i][j]) > -1 && gameMode == 'adventure'){
 				if(endAdded || totalLevelScore < (level[0].length / 20) * (levelNo + 2)){
 					items[items.length] = new Item(parseInt(lv[i][j]) + 2, j << 4, i << 4);
 					totalLevelScore += [5, 10, 20, 50][lv[i][j]];
@@ -1317,7 +1514,7 @@ function loopGame(){
 		context.fillStyle = '#68f';
 		context.fillRect(10.5, 300.5, camera[0].energy / 5, 10);
 		context.strokeRect(10.5, 300.5, camera[0].maxenergy / 5, 10);
-		for(var l = 0; l < 8; l++){
+		for(var l = 0; l < 6; l++){
 			context.strokeStyle = (l == actors[0].select ? '#555' : (actors[0].powers > l ? 'rgba(50, 50, 50, 0.5)' : 'rgba(50, 50, 50, 0.2)'));
 			context.fillStyle = (l == actors[0].select ? 'rgba(180, 180, 210, 0.5)' : (actors[0].powers > l ? 'rgba(200, 200, 200, 0.2)' : 'rgba(200, 200, 200, 0.1)'));
 			context.fillRect(465.5 - (l * 35), 278.5, 30, 30);
@@ -1334,7 +1531,8 @@ function loopGame(){
 	context.fillText('FPS: ' + lastspeed, 10, 20);
 	if(game == 'playing' && gameMode == 'adventure'){
 		context.fillText('Level: ' + (levelNo + 1), 10, 258);
-		context.fillText('Points: ' + score, 10, 275);
+		context.fillText('Points: ' + score, 70, 275);
+		context.fillText('Lives: ' + lives, 10, 275);
 	}
 	if(game == 'playing'){
 		if(gameMode == 'time'){
@@ -1355,9 +1553,9 @@ function loopGame(){
 	if(mobile){
 		context.fillText('RetX: ' + r(mouse.x), 420, 290);
 		context.fillText('RetX: ' + r(mouse.y), 490, 290);
-		context.fillText('Sint mobile version α 0.7.2', 490, 310);
+		context.fillText('Sint mobile Beta 1.0', 490, 310);
 	}else{
-		context.fillText('Sint version α 0.7.2', 490, 20); // β
+		context.fillText('Sint Beta 1.0', 490, 20); // β
 		if(cookies && game == 'menu'){
 			context.fillText('Sint uses cookies to remember', 490, 290);
 			context.fillText('options and time trial records', 490, 310);
@@ -1383,7 +1581,7 @@ function loopGame(){
 	
 	
 	if(message){
-		if(message == 'win'){
+		if(message == 'win' && levelNo < 5){
 			// Message box
 			context.strokeStyle = '#555';
 			context.fillStyle = '#ccc';
@@ -1404,7 +1602,7 @@ function loopGame(){
 			// Text
 			context.fillStyle = '#fff';
 			context.fillText('You have won level ' + (levelNo + 1) + '.', 250, 80);
-			context.fillText((19 - levelNo) + ' levels left.', 250, 100);
+			context.fillText((5 - levelNo) + ' levels left.', 250, 100);
 			context.fillText('Points: ' + score, 250, 125);
 			context.fillStyle = (ui.select == 3 ? 'fff' : '#eef');
 			context.fillText('Continue', 250, 253);
@@ -1454,6 +1652,9 @@ function loopGame(){
 				}
 			}
 		}else{
+			if(levelNo == 5){
+				message = ['You have won the game :D', '', 'Score: ' + score];
+			}
 			context.strokeStyle = '#555';
 			context.fillStyle = '#ccc';
 			context.fillRect(100, 100, 300, 120);
@@ -1469,6 +1670,9 @@ function loopGame(){
 			}
 			if(keysDown.indexOf(13) > -1){
 				message = false;
+				if(lives <= 0 || levelNo == 5){
+					toMenu();
+				}
 			}
 		}
 	}
@@ -1508,7 +1712,7 @@ function loopGame(){
 					game = 'playing';
 					gameMode = 'free';
 					levelNo = 19;
-					actors[0].powers = 8;
+					actors[0].powers = 6;
 					actors[0].maxhealth = 500;
 					actors[0].health = 500;
 					actors[0].maxenergy = 500;
